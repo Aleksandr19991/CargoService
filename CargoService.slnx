@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="CargoService.Application/CargoService.Application.csproj" Id="6b0dcd9d-a8b2-413c-aee4-98be6663ef9d" />
-  <Project Path="CargoService.Domain/CargoService.Domain.csproj" Id="6bb16c8b-7fbf-479a-8a0b-81819afbd7c2" />
-  <Project Path="CargoService/CargoService.API.csproj" />
-</Solution>

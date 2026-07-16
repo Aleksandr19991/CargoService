@@ -1,6 +1,0 @@
-@CargoService_HostAddress = http://localhost:5069
-
-GET {{CargoService_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

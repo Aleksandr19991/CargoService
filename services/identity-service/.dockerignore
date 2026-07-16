@@ -1,0 +1,12 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/out
+**/*.user
+**/*.suo
+**/Logs
+**/logs
+**/.env
+**/.env.*
