@@ -201,7 +201,7 @@
 ### Фаза 0 — Инфраструктура репозитория и окружения
 - [x] Реорганизовать репозиторий в монорепо: `services/{service-name}/` для каждого микросервиса, `shared/CargoService.Contracts/` для общих событийных DTO.
 - [x] Перенести существующий код (`CargoService.*`) в `services/identity-service/`. После убедиться, что в монорепо остались только папки вида `services/{service-name}/`.
-- [ ] Создать файл CLAUDE.md и заполнить его необходимой информацией.
+- [x] Создать файл CLAUDE.md и заполнить его необходимой информацией.
 - [ ] Настроить единый `docker-compose.yml`: PostgreSQL (по контейнеру/схеме на сервис), RabbitMQ (с management UI), MinIO, все сервисы, API Gateway.
 - [ ] Настроить `.editorconfig`, единый стиль кода, Directory.Build.props для общих версий пакетов.
 - [ ] Создать `CargoService.Contracts` (события, версия v1, соглашения об именовании очередей/exchange).
