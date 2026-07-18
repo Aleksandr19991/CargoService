@@ -209,7 +209,7 @@
 - [x] Подключить централизованное логирование (Serilog → Seq) во всех сервисах.
 
 ### Фаза 1 — Identity Service
-- [ ] Добавить роли и авторизацию по ролям (`Client`, `Manager`, `WarehouseOperator`, `Courier`, `Admin`).
+- [x] Добавить роли и авторизацию по ролям (`Client`, `Manager`, `WarehouseOperator`, `Courier`, `Admin`).
 - [ ] Реализовать хэширование пароля (сейчас хранится как есть — заменить на BCrypt/Argon2).
 - [ ] Реализовать `POST /auth/login` с выдачей JWT access/refresh токенов.
 - [ ] Реализовать `POST /auth/refresh`.

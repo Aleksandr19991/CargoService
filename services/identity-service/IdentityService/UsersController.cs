@@ -2,15 +2,19 @@
 using IdentityService.API.Models.Responses;
 using IdentityService.Application.Interfaces;
 using IdentityService.Domain.Entities;
+using IdentityService.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService;
 
 [Route("api/[controller]")]
 [ApiController]
+[Authorize]
 public class UsersController(IUsersService usersService) : ControllerBase
 {
     [HttpPost("register")]
+    [AllowAnonymous]
     public async Task<ActionResult<UserResponse>> RegisterUser(
         [FromBody] RegisterUserRequest request,
         CancellationToken cancellationToken)
@@ -21,7 +25,28 @@ public class UsersController(IUsersService usersService) : ControllerBase
             LastName = request.LastName,
             Phone = request.Phone,
             Email = request.Email,
-            Password = request.Password
+            Password = request.Password,
+            Role = Role.Client
+        };
+
+        var createdUser = await usersService.CreateUserAsync(user, cancellationToken);
+        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, MapToResponse(createdUser));
+    }
+
+    [HttpPost("staff")]
+    [Authorize(Roles = nameof(Role.Admin))]
+    public async Task<ActionResult<UserResponse>> CreateStaffUser(
+        [FromBody] CreateStaffUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = new User
+        {
+            Name = request.Name,
+            LastName = request.LastName,
+            Phone = request.Phone,
+            Email = request.Email,
+            Password = request.Password,
+            Role = request.Role
         };
 
         var createdUser = await usersService.CreateUserAsync(user, cancellationToken);
@@ -29,6 +54,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = $"{nameof(Role.Admin)},{nameof(Role.Manager)}")]
     public async Task<IActionResult> UpdateUser(
         [FromRoute] Guid id,
         [FromBody] UpdateUserRequest request,
@@ -51,6 +77,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = nameof(Role.Admin))]
     public async Task<IActionResult> DeleteUser([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var deleted = await usersService.DeleteUserAsync(id, cancellationToken);
@@ -61,6 +88,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = $"{nameof(Role.Admin)},{nameof(Role.Manager)}")]
     public async Task<ActionResult<List<UserResponse>>> GetAllUsers(CancellationToken cancellationToken)
     {
         var users = await usersService.GetAllUsersAsync(cancellationToken);
@@ -68,6 +96,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = $"{nameof(Role.Admin)},{nameof(Role.Manager)}")]
     public async Task<ActionResult<UserResponse>> GetUserById(Guid id, CancellationToken cancellationToken)
     {
         var user = await usersService.GetUserByIdAsync(id, cancellationToken);
@@ -84,6 +113,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
         LastName = user.LastName,
         Phone = user.Phone,
         Email = user.Email,
+        Role = user.Role,
         IsDeactivated = user.IsDeactivated
     };
 }

@@ -1,4 +1,5 @@
 using IdentityService.Domain.Entities;
+using IdentityService.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,6 +34,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(user => user.Password)
             .HasMaxLength(255)
+            .IsRequired();
+
+        builder.Property(user => user.Role)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(Role.Client)
             .IsRequired();
 
         builder.Property(user => user.IsDeactivated)

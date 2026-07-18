@@ -39,7 +39,13 @@ Path: `services/identity-service/`. Solution file: `IdentityService.slnx` (lives
 
 Projects: `IdentityService.Domain`, `IdentityService.Application`, `IdentityService.Persistence`, `IdentityService` (API/host). Current scope: CRUD over a single `User` entity (register/update/delete/get by id/get all) via `UsersController` at `api/users`. Passwords are stored as plain text on `User.Password` — there is no hashing yet.
 
-`docker-compose.yml` (repo root) also provisions a Keycloak container for this service (`KC_*` env vars, `Keycloak__Authority` / `Keycloak__MetadataAddress` passed into the app), but no authentication middleware is wired up in `Program.cs` yet — Keycloak runs alongside the API without being consumed by it.
+`docker-compose.yml` (repo root) also provisions a Keycloak container for this service (`KC_*` env vars, `Keycloak__Authority` / `Keycloak__MetadataAddress` passed into the app), but Keycloak is **not** the identity provider actually used by the code — see auth below.
+
+### Roles and authorization
+
+`User.Role` (`IdentityService.Domain.Enums.Role`: `Client`, `Manager`, `WarehouseOperator`, `Courier`, `Admin`) is stored as a string column with default `Client`. The API validates and issues its own JWTs (self-hosted auth, unrelated to the Keycloak container above) via `AddAuthentication().AddJwtBearer(...)` in `Program.cs`, configured from the `Jwt:Issuer` / `Jwt:Audience` / `Jwt:SigningKey` config keys — `SigningKey` has no value in `appsettings.json` (fails fast if missing) and only gets a placeholder value in `appsettings.Development.json`; production must supply a real one out-of-band.
+
+There is currently no endpoint that issues a token (`POST /auth/login` is not implemented yet), so every `[Authorize]`-protected endpoint is unreachable until that lands — this is expected, not a bug, given the task split (auth *validation* wired up first, token *issuance* is a separate follow-up piece of work). `POST api/users/register` stays `[AllowAnonymous]` and always creates a `Client`; `POST api/users/staff` (`Admin`-only) is how non-Client accounts get created.
 
 ## Commands
 
