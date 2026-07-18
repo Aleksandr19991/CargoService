@@ -4,7 +4,7 @@ namespace IdentityService.Application.Interfaces;
 
 public interface IUsersService
 {
-    Task<User> CreateUserAsync(User user, CancellationToken cancellationToken = default);
+    Task<User> CreateUserAsync(User user, string password, CancellationToken cancellationToken = default);
     Task<User?> GetUserByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<User>> GetAllUsersAsync(CancellationToken cancellationToken = default);
     Task<bool> UpdateUserAsync(Guid id, User user, CancellationToken cancellationToken = default);

@@ -1,0 +1,66 @@
+{
+  "realm": "cargoservice",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "Client", "description": "Клиент — отправитель/получатель груза" },
+      { "name": "Manager", "description": "Менеджер back-office" },
+      { "name": "WarehouseOperator", "description": "Приёмка/обработка груза на складе" },
+      { "name": "Courier", "description": "Курьер (забор/доставка)" },
+      { "name": "Admin", "description": "Администратор системы" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "identity-service",
+      "name": "identity-service",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "identity-service-dev-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "authorizationServicesEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "identity-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-identity-service",
+      "enabled": true,
+      "serviceAccountClientId": "identity-service",
+      "clientRoles": {
+        "realm-management": ["manage-users"]
+      }
+    },
+    {
+      "username": "admin@cargoservice.local",
+      "email": "admin@cargoservice.local",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "System",
+      "lastName": "Administrator",
+      "credentials": [
+        { "type": "password", "value": "admin", "temporary": false }
+      ],
+      "realmRoles": ["Admin"]
+    }
+  ]
+}

@@ -25,11 +25,10 @@ public class UsersController(IUsersService usersService) : ControllerBase
             LastName = request.LastName,
             Phone = request.Phone,
             Email = request.Email,
-            Password = request.Password,
             Role = Role.Client
         };
 
-        var createdUser = await usersService.CreateUserAsync(user, cancellationToken);
+        var createdUser = await usersService.CreateUserAsync(user, request.Password, cancellationToken);
         return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, MapToResponse(createdUser));
     }
 
@@ -45,11 +44,10 @@ public class UsersController(IUsersService usersService) : ControllerBase
             LastName = request.LastName,
             Phone = request.Phone,
             Email = request.Email,
-            Password = request.Password,
             Role = request.Role
         };
 
-        var createdUser = await usersService.CreateUserAsync(user, cancellationToken);
+        var createdUser = await usersService.CreateUserAsync(user, request.Password, cancellationToken);
         return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, MapToResponse(createdUser));
     }
 

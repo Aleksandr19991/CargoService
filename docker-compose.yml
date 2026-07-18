@@ -66,10 +66,16 @@ services:
     volumes:
       - seq_data:/data
 
+  # Identity provider: realm/client/roles определены как код в
+  # docker/keycloak/realm-export.json и импортируются при каждом старте
+  # (--import-realm). KC_HOSTNAME фиксирован на localhost — это же значение
+  # попадает в claim `iss` выпущенных токенов, поэтому Keycloak__ValidIssuer
+  # у identity-service всегда localhost:8080, независимо от того, как сам
+  # сервис физически достучался до Keycloak (см. CLAUDE.md).
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: cargoservice-keycloak
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -81,6 +87,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
       - "8080:8080"
+    volumes:
+      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,8 +101,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=cargoservice;Username=cargoservice;Password=cargoservice
-      Keycloak__Authority: http://keycloak:8080/realms/master
-      Keycloak__MetadataAddress: http://keycloak:8080/realms/master/.well-known/openid-configuration
+      Keycloak__BaseUrl: http://keycloak:8080
       Seq__ServerUrl: http://seq:80
     ports:
       - "8081:8080"

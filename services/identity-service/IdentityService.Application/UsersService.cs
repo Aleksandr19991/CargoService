@@ -3,11 +3,13 @@ using IdentityService.Domain.Entities;
 
 namespace IdentityService.Application;
 
-public class UsersService(IUsersRepository usersRepository) : IUsersService
+public class UsersService(IUsersRepository usersRepository, IIdentityProviderClient identityProviderClient) : IUsersService
 {
-    public async Task<User> CreateUserAsync(User user, CancellationToken cancellationToken = default)
+    public async Task<User> CreateUserAsync(User user, string password, CancellationToken cancellationToken = default)
     {
-        user.Id = Guid.NewGuid();
+        user.Id = await identityProviderClient.CreateUserAsync(
+            user.Email, user.Name, user.LastName, password, user.Role, cancellationToken);
+
         return await usersRepository.CreateAsync(user, cancellationToken);
     }
 

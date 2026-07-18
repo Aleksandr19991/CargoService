@@ -32,10 +32,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(user => user.Email)
             .IsUnique();
 
-        builder.Property(user => user.Password)
-            .HasMaxLength(255)
-            .IsRequired();
-
         builder.Property(user => user.Role)
             .HasConversion<string>()
             .HasMaxLength(30)
