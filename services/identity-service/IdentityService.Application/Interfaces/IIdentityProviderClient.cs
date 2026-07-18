@@ -1,3 +1,4 @@
+using IdentityService.Application.Models;
 using IdentityService.Domain.Enums;
 
 namespace IdentityService.Application.Interfaces;
@@ -12,5 +13,11 @@ public interface IIdentityProviderClient
         string lastName,
         string password,
         Role role,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Exchanges a username/password for tokens (Resource Owner Password Credentials grant). Returns null on invalid credentials.</summary>
+    Task<AuthToken?> AuthenticateAsync(
+        string username,
+        string password,
         CancellationToken cancellationToken = default);
 }

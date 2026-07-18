@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using IdentityService.Application.Interfaces;
+using IdentityService.Application.Models;
 using IdentityService.Domain.Enums;
 
 namespace IdentityService.Infrastructure.Keycloak;
@@ -23,24 +25,54 @@ public class KeycloakIdentityProviderClient(HttpClient httpClient, KeycloakOptio
         return Guid.Parse(userId);
     }
 
+    public async Task<AuthToken?> AuthenticateAsync(
+        string username,
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        var token = await RequestTokenAsync(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = options.ClientId,
+            ["client_secret"] = options.ClientSecret,
+            ["username"] = username,
+            ["password"] = password,
+        }, cancellationToken);
+
+        if (token is null)
+            return null;
+
+        return new AuthToken(token.AccessToken, token.RefreshToken ?? string.Empty, token.ExpiresIn, token.RefreshExpiresIn, token.TokenType);
+    }
+
     private async Task<string> GetServiceAccountAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        var token = await RequestTokenAsync(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = options.ClientId,
+            ["client_secret"] = options.ClientSecret,
+        }, cancellationToken);
+
+        return token?.AccessToken
+            ?? throw new InvalidOperationException("Keycloak did not return a service account access token.");
+    }
+
+    private async Task<KeycloakTokenResponse?> RequestTokenAsync(
+        Dictionary<string, string> parameters,
+        CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, options.TokenEndpoint)
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "client_credentials",
-                ["client_id"] = options.ClientId,
-                ["client_secret"] = options.ClientSecret,
-            }),
+            Content = new FormUrlEncodedContent(parameters),
         };
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
+            return null;
 
-        var token = await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>(cancellationToken);
-        return token?.AccessToken
-            ?? throw new InvalidOperationException("Keycloak did not return a service account access token.");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>(cancellationToken);
     }
 
     private async Task<string> CreateKeycloakUserAsync(
@@ -100,7 +132,11 @@ public class KeycloakIdentityProviderClient(HttpClient httpClient, KeycloakOptio
     }
 
     private sealed record KeycloakTokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken);
+        [property: JsonPropertyName("access_token")] string AccessToken,
+        [property: JsonPropertyName("refresh_token")] string? RefreshToken = null,
+        [property: JsonPropertyName("expires_in")] int ExpiresIn = 0,
+        [property: JsonPropertyName("refresh_expires_in")] int RefreshExpiresIn = 0,
+        [property: JsonPropertyName("token_type")] string TokenType = "Bearer");
 
     private sealed record KeycloakRoleRepresentation(
         [property: JsonPropertyName("id")] string Id,
