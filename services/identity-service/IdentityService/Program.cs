@@ -127,3 +127,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Makes the top-level-statement-generated Program class visible to
+// WebApplicationFactory<Program> in IdentityService.IntegrationTests.
+public partial class Program;

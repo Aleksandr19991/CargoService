@@ -215,7 +215,7 @@
 - [x] Реализовать `POST /auth/refresh` — аналогично, прокси к Keycloak token endpoint с `grant_type=refresh_token`.
 - [x] Публикация события `UserRegistered` через Outbox.
 - [x] Настроить EF Core миграции и Persistence для PostgreSQL (частично есть — проверить/дополнить).
-- [ ] Unit-тесты Application, интеграционные тесты API (Testcontainers).
+- [x] Unit-тесты Application, интеграционные тесты API (Testcontainers). Интеграционные тесты не запускались вживую в этой среде — нет доступного Docker-демона; прогнать `dotnet test` локально перед тем, как полагаться на них в CI.
 - [ ] Dockerfile + подключение в docker-compose.
 
 ### Фаза 2 — Clients Service (CRM контрагентов)

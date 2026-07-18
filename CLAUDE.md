@@ -83,4 +83,13 @@ dotnet ef database update
 ```
 No `--startup-project` needed — `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) lets `dotnet ef` build an `AppDbContext` directly instead of building the whole `IdentityService` host, which would otherwise also run (and need valid config for) the Keycloak/RabbitMQ setup in `Program.cs`. The factory reads the connection string from the `ConnectionStrings__DefaultConnection` env var, falling back to the same local-Postgres default as `appsettings.json`. `AddPersistence` (the runtime registration) and the factory both enable `EnableRetryOnFailure()` on the Npgsql provider.
 
-There are no test projects yet.
+## Tests
+
+`services/identity-service/IdentityService.Application.Tests/` — xUnit + Moq unit tests for `UsersService` (mocks `IUsersRepository`/`IIdentityProviderClient`/`IOutboxWriter`; covers id assignment from the identity provider, the Client-only outbox enqueue rule, update/delete delegation).
+
+`services/identity-service/IdentityService.IntegrationTests/` — xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers, exercising the real API over a disposable Postgres container (`IdentityApiFactory`, one container per test class via `IClassFixture`). Two stand-ins replace things a real deployment would need but these tests don't provision: `FakeIdentityProviderClient` (no real Keycloak) and `TestAuthHandler` (reads a comma-separated `X-Test-Roles` request header instead of validating a real JWT; becomes the default auth scheme via `ConfigureTestServices`, overriding `Program.cs`'s `AddJwtBearer`). The outbox dispatcher's `IHostedService` is removed in tests too — no RabbitMQ container. Tests assert on HTTP status codes and, via a second `AppDbContext` pointed at the same container, directly on `Users`/`OutboxMessages` rows (e.g. registering a `Client` both creates the user row and enqueues exactly one outbox row with routing key `identity-service.user-registered`; creating staff does not).
+
+```
+dotnet test IdentityService.Application.Tests   # no external dependencies
+dotnet test IdentityService.IntegrationTests    # needs a running Docker daemon (Testcontainers)
+```

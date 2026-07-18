@@ -1,7 +1,9 @@
 <Solution>
   <Project Path="IdentityService.Application/IdentityService.Application.csproj" Id="6b0dcd9d-a8b2-413c-aee4-98be6663ef9d" />
+  <Project Path="IdentityService.Application.Tests/IdentityService.Application.Tests.csproj" />
   <Project Path="IdentityService.Domain/IdentityService.Domain.csproj" Id="6bb16c8b-7fbf-479a-8a0b-81819afbd7c2" />
   <Project Path="IdentityService.Infrastructure/IdentityService.Infrastructure.csproj" />
+  <Project Path="IdentityService.IntegrationTests/IdentityService.IntegrationTests.csproj" />
   <Project Path="IdentityService.Persistence/IdentityService.Persistence.csproj" />
   <Project Path="IdentityService/IdentityService.API.csproj" />
   <Project Path="../../shared/CargoService.Contracts/CargoService.Contracts.csproj" />
