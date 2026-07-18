@@ -12,7 +12,7 @@ Only **identity-service** has actual code today; every other service under `serv
 
 ```
 services/{service-name}/     one microservice per folder (see spec.md §2 for the full list)
-shared/CargoService.Contracts/   shared library for RabbitMQ event DTOs (empty scaffold so far)
+shared/CargoService.Contracts/   shared library of v1 RabbitMQ event DTOs (Events/V1/), not yet referenced by any service project
 spec.md                      architecture spec + phased backlog — source of truth for what to build next
 Directory.Build.props        common MSBuild properties (TargetFramework, Nullable, ImplicitUsings, LangVersion) for every project in the repo
 Directory.Packages.props     central package management — package versions are pinned here; csproj files reference packages without a Version attribute
