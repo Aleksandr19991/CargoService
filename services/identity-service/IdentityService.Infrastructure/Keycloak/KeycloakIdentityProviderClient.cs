@@ -45,6 +45,24 @@ public class KeycloakIdentityProviderClient(HttpClient httpClient, KeycloakOptio
         return new AuthToken(token.AccessToken, token.RefreshToken ?? string.Empty, token.ExpiresIn, token.RefreshExpiresIn, token.TokenType);
     }
 
+    public async Task<AuthToken?> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        var token = await RequestTokenAsync(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = options.ClientId,
+            ["client_secret"] = options.ClientSecret,
+            ["refresh_token"] = refreshToken,
+        }, cancellationToken);
+
+        if (token is null)
+            return null;
+
+        return new AuthToken(token.AccessToken, token.RefreshToken ?? string.Empty, token.ExpiresIn, token.RefreshExpiresIn, token.TokenType);
+    }
+
     private async Task<string> GetServiceAccountAccessTokenAsync(CancellationToken cancellationToken)
     {
         var token = await RequestTokenAsync(new Dictionary<string, string>

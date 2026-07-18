@@ -29,4 +29,23 @@ public class AuthController(IIdentityProviderClient identityProviderClient) : Co
             TokenType = token.TokenType
         });
     }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> Refresh(
+        [FromBody] RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        var token = await identityProviderClient.RefreshAsync(request.RefreshToken, cancellationToken);
+        if (token is null)
+            return Unauthorized();
+
+        return Ok(new LoginResponse
+        {
+            AccessToken = token.AccessToken,
+            RefreshToken = token.RefreshToken,
+            ExpiresIn = token.ExpiresIn,
+            TokenType = token.TokenType
+        });
+    }
 }

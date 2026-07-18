@@ -20,4 +20,9 @@ public interface IIdentityProviderClient
         string username,
         string password,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Exchanges a refresh token for a new token pair. Returns null if the refresh token is invalid or expired.</summary>
+    Task<AuthToken?> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default);
 }
