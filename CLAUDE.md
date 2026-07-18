@@ -74,7 +74,9 @@ Full local stack (Postgres + RabbitMQ + MinIO + Seq + Keycloak + identity-servic
 ```
 docker compose up --build
 ```
-`docker-compose.override.yml` is picked up automatically (no `-f` needed) and runs the service via the Dockerfile's `dev` stage (`dotnet watch`, source bind-mounted) instead of the published `final` image — edits to `.cs` files under `services/identity-service/` hot-reload inside the container. Each service's `dev` stage/override entry is added alongside its `Dockerfile` as that service gets built.
+`docker-compose.override.yml` is picked up automatically (no `-f` needed) and runs the service via the Dockerfile's `dev` stage (`dotnet watch`, source bind-mounted) instead of the published `final` image — edits to `.cs` files under `services/identity-service/` (or `shared/CargoService.Contracts/`) hot-reload inside the container. Each service's `dev` stage/override entry is added alongside its `Dockerfile` as that service gets built.
+
+`services/identity-service/Dockerfile`'s build context is the **repo root** (`docker-compose.yml`'s `build.context: .`, `dockerfile: services/identity-service/Dockerfile`), not `services/identity-service/` itself — `IdentityService.Application` references `shared/CargoService.Contracts`, which lives outside the service's own folder and would otherwise be unreachable by Docker. Same reasoning for the `dev` stage's bind mount in `docker-compose.override.yml`: it mounts the whole repo root (`.:/src`), not just `services/identity-service/`, so `shared/CargoService.Contracts` is visible for `dotnet watch` too. If you add a service whose Dockerfile only needs its own folder (no shared-project dependency), a narrower per-service context is simpler and fine — this repo-root pattern is only necessary because of the Contracts dependency.
 
 EF Core migrations (run from `services/identity-service/IdentityService.Persistence/`):
 ```

@@ -216,7 +216,7 @@
 - [x] Публикация события `UserRegistered` через Outbox.
 - [x] Настроить EF Core миграции и Persistence для PostgreSQL (частично есть — проверить/дополнить).
 - [x] Unit-тесты Application, интеграционные тесты API (Testcontainers). Интеграционные тесты не запускались вживую в этой среде — нет доступного Docker-демона; прогнать `dotnet test` локально перед тем, как полагаться на них в CI.
-- [ ] Dockerfile + подключение в docker-compose.
+- [x] Dockerfile + подключение в docker-compose. Dockerfile и подключение в `docker-compose.yml` были сделаны ещё в Фазе 0, но с тех пор `IdentityService.Application` обзавёлся зависимостью на `shared/CargoService.Contracts` (задача «Outbox»), которая лежит вне `services/identity-service` — старый build-контекст не мог её достать. Контекст сборки перенесён на корень репозитория (Dockerfile/override обновлены), сам образ собрать вживую не удалось (нет Docker-демона в этой среде), но идентичные `dotnet restore`/`dotnet publish` из корня репозитория прошли успешно и подтвердили, что граф проектов резолвится.
 
 ### Фаза 2 — Clients Service (CRM контрагентов)
 - [ ] Создать проект (Domain/Application/Persistence/Infrastructure/API).

@@ -11,9 +11,14 @@ services:
     build:
       target: dev
     volumes:
-      - ./services/identity-service:/src
+      # Весь репозиторий, не только services/identity-service — сервис ссылается на
+      # shared/CargoService.Contracts, которая иначе не была бы видна dotnet watch
+      # внутри контейнера. dotnet watch следит только за файлами графа проекта
+      # (services/identity-service/** + shared/CargoService.Contracts/**), так что
+      # изменения в других services/{other-service}/ ни на что не влияют.
+      - .:/src
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
 
-  # Остальные сервисы получают аналогичный override (build.target: dev +
-  # volume на свою папку services/{service-name}) по мере появления их Dockerfile-ов.
+  # Остальные сервисы получают аналогичный override (build.target: dev, volume
+  # на весь репозиторий) по мере появления их Dockerfile-ов.
