@@ -76,10 +76,11 @@ docker compose up --build
 ```
 `docker-compose.override.yml` is picked up automatically (no `-f` needed) and runs the service via the Dockerfile's `dev` stage (`dotnet watch`, source bind-mounted) instead of the published `final` image — edits to `.cs` files under `services/identity-service/` hot-reload inside the container. Each service's `dev` stage/override entry is added alongside its `Dockerfile` as that service gets built.
 
-EF Core migrations (run from `services/identity-service/IdentityService.Persistence/`, targeting the API project for startup config):
+EF Core migrations (run from `services/identity-service/IdentityService.Persistence/`):
 ```
-dotnet ef migrations add <Name> --startup-project ../IdentityService
-dotnet ef database update --startup-project ../IdentityService
+dotnet ef migrations add <Name>
+dotnet ef database update
 ```
+No `--startup-project` needed — `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) lets `dotnet ef` build an `AppDbContext` directly instead of building the whole `IdentityService` host, which would otherwise also run (and need valid config for) the Keycloak/RabbitMQ setup in `Program.cs`. The factory reads the connection string from the `ConnectionStrings__DefaultConnection` env var, falling back to the same local-Postgres default as `appsettings.json`. `AddPersistence` (the runtime registration) and the factory both enable `EnableRetryOnFailure()` on the Npgsql provider.
 
 There are no test projects yet.

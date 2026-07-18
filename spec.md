@@ -214,7 +214,7 @@
 - [x] Реализовать `POST /auth/login` — теперь означает прокси к Keycloak token endpoint (Resource Owner Password Credentials, `directAccessGrantsEnabled` уже включён в realm-export) с выдачей access/refresh токенов, а не самостоятельную выдачу JWT сервисом.
 - [x] Реализовать `POST /auth/refresh` — аналогично, прокси к Keycloak token endpoint с `grant_type=refresh_token`.
 - [x] Публикация события `UserRegistered` через Outbox.
-- [ ] Настроить EF Core миграции и Persistence для PostgreSQL (частично есть — проверить/дополнить).
+- [x] Настроить EF Core миграции и Persistence для PostgreSQL (частично есть — проверить/дополнить).
 - [ ] Unit-тесты Application, интеграционные тесты API (Testcontainers).
 - [ ] Dockerfile + подключение в docker-compose.
 

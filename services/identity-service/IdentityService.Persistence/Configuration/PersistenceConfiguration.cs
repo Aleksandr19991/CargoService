@@ -11,7 +11,7 @@ public static class PersistenceConfiguration
     public static IServiceCollection AddPersistence(this IServiceCollection services, string connectionString)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString));
+            options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<IUsersRepository, UsersRepository>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
