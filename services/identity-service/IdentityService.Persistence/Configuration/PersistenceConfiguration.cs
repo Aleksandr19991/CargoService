@@ -1,4 +1,5 @@
 using IdentityService.Application.Interfaces;
+using IdentityService.Persistence.Outbox;
 using IdentityService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public static class PersistenceConfiguration
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IUsersRepository, UsersRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }

@@ -102,11 +102,14 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=cargoservice;Username=cargoservice;Password=cargoservice
       Keycloak__BaseUrl: http://keycloak:8080
+      RabbitMQ__HostName: rabbitmq
       Seq__ServerUrl: http://seq:80
     ports:
       - "8081:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       keycloak:
         condition: service_started

@@ -213,7 +213,7 @@
 - [x] ~~Реализовать хэширование пароля~~ — заменено интеграцией с Keycloak: realm/client/роли заведены как код (`docker/keycloak/realm-export.json`, импортируется при старте контейнера), API валидирует JWT, выпущенные Keycloak (`IdentityService.Infrastructure.Keycloak`), локальный пароль больше не хранится вовсе (миграция `DropUserPassword`) — Keycloak единственный держатель учётных данных. Регистрация/создание сотрудника создаёт пользователя в Keycloak через Admin API (`IIdentityProviderClient`) и назначает realm-роль.
 - [x] Реализовать `POST /auth/login` — теперь означает прокси к Keycloak token endpoint (Resource Owner Password Credentials, `directAccessGrantsEnabled` уже включён в realm-export) с выдачей access/refresh токенов, а не самостоятельную выдачу JWT сервисом.
 - [x] Реализовать `POST /auth/refresh` — аналогично, прокси к Keycloak token endpoint с `grant_type=refresh_token`.
-- [ ] Публикация события `UserRegistered` через Outbox.
+- [x] Публикация события `UserRegistered` через Outbox.
 - [ ] Настроить EF Core миграции и Persistence для PostgreSQL (частично есть — проверить/дополнить).
 - [ ] Unit-тесты Application, интеграционные тесты API (Testcontainers).
 - [ ] Dockerfile + подключение в docker-compose.

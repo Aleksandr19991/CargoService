@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Cargo shipping platform being built as a **.NET 10 / C# microservices monorepo** (PostgreSQL per service, RabbitMQ for inter-service events — RabbitMQ integration is not wired up yet, Serilog → Seq for centralized logging). The full target architecture, the list of microservices, their entities/APIs/events, and the development backlog (organized in phases) are specified in [spec.md](spec.md) — read it before planning cross-service work or adding a new microservice, and keep its Фаза 0 checklist in [spec.md](spec.md) updated as repo-infrastructure tasks are completed.
+Cargo shipping platform being built as a **.NET 10 / C# microservices monorepo** (PostgreSQL per service, RabbitMQ for inter-service events via a transactional outbox, Serilog → Seq for centralized logging). The full target architecture, the list of microservices, their entities/APIs/events, and the development backlog (organized in phases) are specified in [spec.md](spec.md) — read it before planning cross-service work or adding a new microservice, and keep its Фаза 0 checklist in [spec.md](spec.md) updated as repo-infrastructure tasks are completed.
 
 Only **identity-service** has actual code today; every other service under `services/` is a placeholder folder with a `README.md` pointing at its section of `spec.md`.
 
@@ -12,7 +12,7 @@ Only **identity-service** has actual code today; every other service under `serv
 
 ```
 services/{service-name}/     one microservice per folder (see spec.md §2 for the full list)
-shared/CargoService.Contracts/   shared library of v1 RabbitMQ event DTOs (Events/V1/), not yet referenced by any service project
+shared/CargoService.Contracts/   shared library of v1 RabbitMQ event DTOs (Events/V1/) and topology conventions (Messaging/RabbitMqConventions.cs)
 spec.md                      architecture spec + phased backlog — source of truth for what to build next
 Directory.Build.props        common MSBuild properties (TargetFramework, Nullable, ImplicitUsings, LangVersion) for every project in the repo
 Directory.Packages.props     central package management — package versions are pinned here; csproj files reference packages without a Version attribute
@@ -49,6 +49,18 @@ Auth is delegated to **Keycloak**, not self-issued. `docker-compose.yml`'s `keyc
 - `POST api/users/register` stays `[AllowAnonymous]` and always creates a `Client`; `POST api/users/staff` (`Admin`-only) is how non-Client accounts get created — both go through the same Keycloak-provisioning path.
 
 `AuthController` (`[AllowAnonymous]`) proxies to Keycloak's token endpoint via `IIdentityProviderClient`, both returning `{ accessToken, refreshToken, expiresIn, tokenType }` or `401`: `POST api/auth/login` (`AuthenticateAsync`, ROPC grant) and `POST api/auth/refresh` (`RefreshAsync`, `grant_type=refresh_token`). For manual testing, the seeded `admin@cargoservice.local` / `admin` user from `realm-export.json` works against `login`.
+
+### Publishing events: transactional outbox
+
+`UsersService.CreateUserAsync` publishes `CargoService.Contracts.Events.V1.UserRegistered` — but only when `user.Role == Role.Client` (self-registration), not for `api/users/staff`-created accounts, since the event exists for clients-service to auto-create a `ClientAccount` and staff aren't clients.
+
+The write path is split across two Application ports, both implemented in `IdentityService.Persistence/Outbox/` against the same `AppDbContext`:
+- `IOutboxWriter.Enqueue(...)` — called by `UsersService` *before* `usersRepository.CreateAsync(user, ...)`. It only stages an `OutboxMessage` row on the DbContext (no `SaveChanges`); the repository call right after it does the actual `SaveChangesAsync`, which — because both go through the same scoped `AppDbContext` instance — commits the `User` insert and the `OutboxMessage` insert in one DB transaction. This ordering (enqueue, then let the next repository call save) is the whole trick and is easy to break by accident; there's no compiler-enforced unit-of-work here.
+- `IOutboxReader` (`GetPendingAsync`/`MarkProcessedAsync`) — used by the dispatcher below, not by request-handling code.
+
+`IdentityService.Infrastructure/Outbox/OutboxDispatcher.cs` is a `BackgroundService` (registered via `AddHostedService` in `AddInfrastructure`) that polls `IOutboxReader` every 5s, publishes pending rows to `RabbitMqConventions.EventsExchange` (topic exchange `cargoservice.events`) using each row's precomputed routing key (`RabbitMqConventions.RoutingKey("identity-service", nameof(UserRegistered))` → `identity-service.user-registered`), and marks them processed. If RabbitMQ is unreachable or the connection drops, the whole connect+poll loop is retried after 10s rather than crashing the host — an unhandled exception in a `BackgroundService` otherwise takes the whole app down by default. RabbitMQ connection settings come from the `RabbitMQ` config section / `RabbitMQ__HostName` env var override in `docker-compose.yml` (same override pattern as `ConnectionStrings`/`Seq`/`Keycloak`).
+
+Nothing currently consumes `identity-service.user-registered` — that's clients-service, not built yet (see spec.md Фаза 2).
 
 ## Commands
 
