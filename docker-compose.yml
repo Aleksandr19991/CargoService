@@ -1,4 +1,7 @@
 services:
+  # Единый Postgres-инстанс для локальной разработки, база+пользователь на сервис
+  # (database-per-service, см. docker/init-db.sql). Каждый новый сервис добавляет
+  # свой CREATE USER/DATABASE блок в init-db.sql и свою переменную подключения ниже.
   postgres:
     image: postgres:16-alpine
     container_name: cargoservice-postgres
@@ -15,6 +18,41 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cargoservice-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI: http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: cargoservice-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Console: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -53,5 +91,11 @@ services:
       keycloak:
         condition: service_started
 
+  # Остальные сервисы (orders-service, cargo-service, pricing-service, ...) добавляются
+  # сюда по мере реализации их Dockerfile-ов (см. spec.md, Фазы 1-12), а также
+  # api-gateway — по мере реализации Фазы 12.
+
 volumes:
   postgres_data:
+  rabbitmq_data:
+  minio_data:

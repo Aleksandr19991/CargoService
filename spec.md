@@ -202,7 +202,7 @@
 - [x] Реорганизовать репозиторий в монорепо: `services/{service-name}/` для каждого микросервиса, `shared/CargoService.Contracts/` для общих событийных DTO.
 - [x] Перенести существующий код (`CargoService.*`) в `services/identity-service/`. После убедиться, что в монорепо остались только папки вида `services/{service-name}/`.
 - [x] Создать файл CLAUDE.md и заполнить его необходимой информацией.
-- [ ] Настроить единый `docker-compose.yml`: PostgreSQL (по контейнеру/схеме на сервис), RabbitMQ (с management UI), MinIO, все сервисы, API Gateway.
+- [x] Настроить единый `docker-compose.yml`: PostgreSQL (по контейнеру/схеме на сервис), RabbitMQ (с management UI), MinIO, все сервисы, API Gateway.
 - [ ] Настроить `.editorconfig`, единый стиль кода, Directory.Build.props для общих версий пакетов.
 - [ ] Создать `CargoService.Contracts` (события, версия v1, соглашения об именовании очередей/exchange).
 - [ ] Настроить общий шаблон `docker-compose.override.yml` для локальной разработки (hot reload, миграции при старте).
