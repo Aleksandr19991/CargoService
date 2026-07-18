@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Cargo shipping platform being built as a **.NET 10 / C# microservices monorepo** (PostgreSQL per service, RabbitMQ for inter-service events — RabbitMQ integration is not wired up yet). The full target architecture, the list of microservices, their entities/APIs/events, and the development backlog (organized in phases) are specified in [spec.md](spec.md) — read it before planning cross-service work or adding a new microservice, and keep its Фаза 0 checklist in [spec.md](spec.md) updated as repo-infrastructure tasks are completed.
+Cargo shipping platform being built as a **.NET 10 / C# microservices monorepo** (PostgreSQL per service, RabbitMQ for inter-service events — RabbitMQ integration is not wired up yet, Serilog → Seq for centralized logging). The full target architecture, the list of microservices, their entities/APIs/events, and the development backlog (organized in phases) are specified in [spec.md](spec.md) — read it before planning cross-service work or adding a new microservice, and keep its Фаза 0 checklist in [spec.md](spec.md) updated as repo-infrastructure tasks are completed.
 
 Only **identity-service** has actual code today; every other service under `services/` is a placeholder folder with a `README.md` pointing at its section of `spec.md`.
 
@@ -31,6 +31,8 @@ Wiring between layers is done via `IServiceCollection` extension methods, not in
 
 `Program.cs` calls both, then runs `dbContext.Database.MigrateAsync()` on startup before mapping controllers — migrations are applied automatically when the API boots, there is no separate migration step in normal dev/docker flow.
 
+Logging is Serilog, wired via `builder.Host.UseSerilog(...)` in `Program.cs` (not the default `Logging` config section — appsettings use a `Serilog`/`MinimumLevel` section instead). It always writes to console; it additionally writes to Seq when `Seq:ServerUrl` is set (`http://localhost:5341` in `appsettings.Development.json` for local runs, overridden to `http://seq:80` via the `Seq__ServerUrl` env var in `docker-compose.yml` for the containerized network). New services should copy this same `UseSerilog` block plus the `Seq:ServerUrl` config convention rather than inventing a different logging setup.
+
 ## identity-service
 
 Path: `services/identity-service/`. Solution file: `IdentityService.slnx` (lives inside the service folder, not at repo root — there is currently no repo-wide solution).
@@ -47,7 +49,7 @@ dotnet build IdentityService.slnx
 dotnet run --project IdentityService
 ```
 
-Full local stack (Postgres + RabbitMQ + MinIO + Keycloak + identity-service API), from repo root:
+Full local stack (Postgres + RabbitMQ + MinIO + Seq + Keycloak + identity-service API), from repo root:
 ```
 docker compose up --build
 ```

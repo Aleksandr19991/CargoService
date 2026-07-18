@@ -54,6 +54,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # Централизованное логирование: каждый сервис пишет структурные логи через
+  # Serilog в Seq (см. CLAUDE.md). UI: http://localhost:5341
+  seq:
+    image: datalust/seq:latest
+    container_name: cargoservice-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5341:80"
+    volumes:
+      - seq_data:/data
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: cargoservice-keycloak
@@ -83,12 +95,15 @@ services:
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=cargoservice;Username=cargoservice;Password=cargoservice
       Keycloak__Authority: http://keycloak:8080/realms/master
       Keycloak__MetadataAddress: http://keycloak:8080/realms/master/.well-known/openid-configuration
+      Seq__ServerUrl: http://seq:80
     ports:
       - "8081:8080"
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
+        condition: service_started
+      seq:
         condition: service_started
 
   # Остальные сервисы (orders-service, cargo-service, pricing-service, ...) добавляются
@@ -99,3 +114,4 @@ volumes:
   postgres_data:
   rabbitmq_data:
   minio_data:
+  seq_data:

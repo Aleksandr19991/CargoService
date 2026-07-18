@@ -206,7 +206,7 @@
 - [x] Настроить `.editorconfig`, единый стиль кода, Directory.Build.props для общих версий пакетов.
 - [x] Создать `CargoService.Contracts` (события, версия v1, соглашения об именовании очередей/exchange).
 - [x] Настроить общий шаблон `docker-compose.override.yml` для локальной разработки (hot reload, миграции при старте).
-- [ ] Подключить централизованное логирование (Serilog → Seq) во всех сервисах.
+- [x] Подключить централизованное логирование (Serilog → Seq) во всех сервисах.
 
 ### Фаза 1 — Identity Service
 - [ ] Добавить роли и авторизацию по ролям (`Client`, `Manager`, `WarehouseOperator`, `Courier`, `Admin`).

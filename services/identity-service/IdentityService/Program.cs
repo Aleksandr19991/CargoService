@@ -3,8 +3,23 @@ using IdentityService.Application.Configuration;
 using IdentityService.Persistence;
 using IdentityService.Persistence.Configuration;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", "IdentityService")
+        .WriteTo.Console();
+
+    var seqServerUrl = context.Configuration["Seq:ServerUrl"];
+    if (!string.IsNullOrWhiteSpace(seqServerUrl))
+        configuration.WriteTo.Seq(seqServerUrl);
+});
 
 // Add services to the container.
 
@@ -33,6 +48,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
