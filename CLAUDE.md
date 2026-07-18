@@ -14,6 +14,9 @@ Only **identity-service** has actual code today; every other service under `serv
 services/{service-name}/     one microservice per folder (see spec.md §2 for the full list)
 shared/CargoService.Contracts/   shared library for RabbitMQ event DTOs (empty scaffold so far)
 spec.md                      architecture spec + phased backlog — source of truth for what to build next
+Directory.Build.props        common MSBuild properties (TargetFramework, Nullable, ImplicitUsings, LangVersion) for every project in the repo
+Directory.Packages.props     central package management — package versions are pinned here; csproj files reference packages without a Version attribute
+.editorconfig                shared C# style/formatting/naming rules for all services
 ```
 
 Each microservice follows Clean Architecture with one project per layer, named `{ServiceName}.{Layer}`:
@@ -55,4 +58,4 @@ dotnet ef migrations add <Name> --startup-project ../IdentityService
 dotnet ef database update --startup-project ../IdentityService
 ```
 
-There are no test projects and no lint/format config (`.editorconfig`) in the repo yet.
+There are no test projects yet.
