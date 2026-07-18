@@ -1,0 +1,19 @@
+# Локальная разработка: docker-compose CLI подхватывает этот файл автоматически
+# поверх docker-compose.yml при обычном `docker compose up` (без -f).
+#
+# Даёт hot reload через `dotnet watch` (см. dev-стадию в Dockerfile каждого сервиса):
+# исходники монтируются как volume, изменения в .cs подхватываются без пересборки
+# образа. Применение миграций при старте не требует отдельной настройки здесь —
+# каждый сервис вызывает `dbContext.Database.MigrateAsync()` в своём Program.cs
+# при любом запуске (см. CLAUDE.md), в т.ч. и в dev-режиме.
+services:
+  cargoservice:
+    build:
+      target: dev
+    volumes:
+      - ./services/identity-service:/src
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+
+  # Остальные сервисы получают аналогичный override (build.target: dev +
+  # volume на свою папку services/{service-name}) по мере появления их Dockerfile-ов.

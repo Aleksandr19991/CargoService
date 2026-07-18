@@ -205,7 +205,7 @@
 - [x] Настроить единый `docker-compose.yml`: PostgreSQL (по контейнеру/схеме на сервис), RabbitMQ (с management UI), MinIO, все сервисы, API Gateway.
 - [x] Настроить `.editorconfig`, единый стиль кода, Directory.Build.props для общих версий пакетов.
 - [x] Создать `CargoService.Contracts` (события, версия v1, соглашения об именовании очередей/exchange).
-- [ ] Настроить общий шаблон `docker-compose.override.yml` для локальной разработки (hot reload, миграции при старте).
+- [x] Настроить общий шаблон `docker-compose.override.yml` для локальной разработки (hot reload, миграции при старте).
 - [ ] Подключить централизованное логирование (Serilog → Seq) во всех сервисах.
 
 ### Фаза 1 — Identity Service

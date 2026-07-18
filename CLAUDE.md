@@ -47,10 +47,11 @@ dotnet build IdentityService.slnx
 dotnet run --project IdentityService
 ```
 
-Full local stack (Postgres + Keycloak + identity-service API), from repo root:
+Full local stack (Postgres + RabbitMQ + MinIO + Keycloak + identity-service API), from repo root:
 ```
 docker compose up --build
 ```
+`docker-compose.override.yml` is picked up automatically (no `-f` needed) and runs the service via the Dockerfile's `dev` stage (`dotnet watch`, source bind-mounted) instead of the published `final` image — edits to `.cs` files under `services/identity-service/` hot-reload inside the container. Each service's `dev` stage/override entry is added alongside its `Dockerfile` as that service gets built.
 
 EF Core migrations (run from `services/identity-service/IdentityService.Persistence/`, targeting the API project for startup config):
 ```
