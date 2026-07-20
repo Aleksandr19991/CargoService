@@ -1,97 +1,97 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Этот файл содержит инструкции для Claude Code (claude.ai/code) при работе с кодом в этом репозитории.
 
-## Project overview
+## Обзор проекта
 
-Cargo shipping platform being built as a **.NET 10 / C# microservices monorepo** (PostgreSQL per service, RabbitMQ for inter-service events via a transactional outbox, Serilog → Seq for centralized logging). The full target architecture, the list of microservices, their entities/APIs/events, and the development backlog (organized in phases) are specified in [spec.md](spec.md) — read it before planning cross-service work or adding a new microservice, and keep its Фаза 0 checklist in [spec.md](spec.md) updated as repo-infrastructure tasks are completed.
+Платформа грузоперевозок, разрабатываемая как **монорепозиторий микросервисов на .NET 10 / C#** (PostgreSQL на каждый сервис, RabbitMQ для межсервисных событий через транзакционный outbox, Serilog → Seq для централизованного логирования). Полная целевая архитектура, список микросервисов, их сущности/API/события и бэклог разработки (по фазам) описаны в [spec.md](spec.md) — читайте его перед планированием кросс-сервисной работы или добавлением нового микросервиса, и держите его чек-лист Фазы 0 в [spec.md](spec.md) актуальным по мере выполнения задач по инфраструктуре репозитория.
 
-Only **identity-service** has actual code today; every other service under `services/` is a placeholder folder with a `README.md` pointing at its section of `spec.md`.
+Реальный код сегодня есть только у **identity-service**; каждый остальной сервис под `services/` — это папка-заглушка с `README.md`, указывающим на соответствующий раздел `spec.md`.
 
-## Repository layout
+## Структура репозитория
 
 ```
-services/{service-name}/     one microservice per folder (see spec.md §2 for the full list)
-shared/CargoService.Contracts/   shared library of v1 RabbitMQ event DTOs (Events/V1/) and topology conventions (Messaging/RabbitMqConventions.cs)
-spec.md                      architecture spec + phased backlog — source of truth for what to build next
-Directory.Build.props        common MSBuild properties (TargetFramework, Nullable, ImplicitUsings, LangVersion) for every project in the repo
-Directory.Packages.props     central package management — package versions are pinned here; csproj files reference packages without a Version attribute
-.editorconfig                shared C# style/formatting/naming rules for all services
+services/{service-name}/     один микросервис на папку (полный список — spec.md §2)
+shared/CargoService.Contracts/   общая библиотека DTO событий RabbitMQ v1 (Events/V1/) и конвенций топологии (Messaging/RabbitMqConventions.cs)
+spec.md                      архитектурная спецификация + бэклог по фазам — источник истины о том, что строить дальше
+Directory.Build.props        общие MSBuild-свойства (TargetFramework, Nullable, ImplicitUsings, LangVersion) для всех проектов репозитория
+Directory.Packages.props     централизованное управление пакетами — версии пакетов закреплены здесь; csproj-файлы ссылаются на пакеты без атрибута Version
+.editorconfig                общие правила стиля/форматирования/именования C# для всех сервисов
 ```
 
-Each microservice follows Clean Architecture with one project per layer, named `{ServiceName}.{Layer}`:
-- `{ServiceName}.Domain` — entities only, no dependencies.
-- `{ServiceName}.Application` — use-case services + interfaces (e.g. `IUsersService`, `IUsersRepository`), depends on Domain.
-- `{ServiceName}.Persistence` — EF Core `DbContext`, `IEntityTypeConfiguration<T>` classes (auto-discovered via `ApplyConfigurationsFromAssembly`), repository implementations, EF migrations. Depends on Application + Domain.
-- `{ServiceName}` (no suffix) — the ASP.NET Core Web API host/controllers project. Depends on Application + Persistence.
+Каждый микросервис построен по Clean Architecture с одним проектом на слой, названным `{ServiceName}.{Layer}`:
+- `{ServiceName}.Domain` — только сущности, без зависимостей.
+- `{ServiceName}.Application` — сервисы сценариев использования + интерфейсы (например, `IUsersService`, `IUsersRepository`), зависит от Domain.
+- `{ServiceName}.Persistence` — EF Core `DbContext`, классы `IEntityTypeConfiguration<T>` (автоматически обнаруживаются через `ApplyConfigurationsFromAssembly`), реализации репозиториев, EF-миграции. Зависит от Application + Domain.
+- `{ServiceName}` (без суффикса) — проект хоста/контроллеров ASP.NET Core Web API. Зависит от Application + Persistence.
 
-Wiring between layers is done via `IServiceCollection` extension methods, not inline in `Program.cs`:
-- `AddApplicationServices()` (in `{ServiceName}.Application/Configuration/ServicesConfiguration.cs`) registers Application-layer services.
-- `AddPersistence(connectionString)` (in `{ServiceName}.Persistence/Configuration/PersistenceConfiguration.cs`) registers the `DbContext` (Npgsql) and repositories.
+Связывание между слоями выполняется через extension-методы `IServiceCollection`, а не инлайном в `Program.cs`:
+- `AddApplicationServices()` (в `{ServiceName}.Application/Configuration/ServicesConfiguration.cs`) регистрирует сервисы слоя Application.
+- `AddPersistence(connectionString)` (в `{ServiceName}.Persistence/Configuration/PersistenceConfiguration.cs`) регистрирует `DbContext` (Npgsql) и репозитории.
 
-`Program.cs` calls both, then runs `dbContext.Database.MigrateAsync()` on startup before mapping controllers — migrations are applied automatically when the API boots, there is no separate migration step in normal dev/docker flow.
+`Program.cs` вызывает оба, затем при старте запускает `dbContext.Database.MigrateAsync()` перед маппингом контроллеров — миграции применяются автоматически при запуске API, отдельного шага миграции в обычном dev/docker-процессе нет.
 
-Logging is Serilog, wired via `builder.Host.UseSerilog(...)` in `Program.cs` (not the default `Logging` config section — appsettings use a `Serilog`/`MinimumLevel` section instead). It always writes to console; it additionally writes to Seq when `Seq:ServerUrl` is set (`http://localhost:5341` in `appsettings.Development.json` for local runs, overridden to `http://seq:80` via the `Seq__ServerUrl` env var in `docker-compose.yml` for the containerized network). New services should copy this same `UseSerilog` block plus the `Seq:ServerUrl` config convention rather than inventing a different logging setup.
+Логирование через Serilog, подключается через `builder.Host.UseSerilog(...)` в `Program.cs` (не через стандартную секцию конфигурации `Logging` — appsettings используют секцию `Serilog`/`MinimumLevel`). Логи всегда пишутся в консоль; дополнительно пишутся в Seq, если задан `Seq:ServerUrl` (`http://localhost:5341` в `appsettings.Development.json` для локальных запусков, переопределяется на `http://seq:80` через переменную окружения `Seq__ServerUrl` в `docker-compose.yml` для контейнерной сети). Новые сервисы должны копировать этот же блок `UseSerilog` и конвенцию конфигурации `Seq:ServerUrl`, а не изобретать собственную настройку логирования.
 
 ## identity-service
 
-Path: `services/identity-service/`. Solution file: `IdentityService.slnx` (lives inside the service folder, not at repo root — there is currently no repo-wide solution).
+Путь: `services/identity-service/`. Файл решения: `IdentityService.slnx` (лежит внутри папки сервиса, а не в корне репозитория — репозиторного решения на весь монорепо пока не существует).
 
-Projects: `IdentityService.Domain`, `IdentityService.Application`, `IdentityService.Infrastructure`, `IdentityService.Persistence`, `IdentityService` (API/host). Current scope: CRUD over a single `User` entity (register/update/delete/get by id/get all) via `UsersController` at `api/users`. `User` has no password field — credentials live entirely in Keycloak (see below).
+Проекты: `IdentityService.Domain`, `IdentityService.Application`, `IdentityService.Infrastructure`, `IdentityService.Persistence`, `IdentityService` (API/хост). Текущий охват: CRUD над одной сущностью `User` (регистрация/обновление/удаление/получение по id/получение всех) через `UsersController` на `api/users`. У `User` нет поля пароля — учётные данные целиком живут в Keycloak (см. ниже).
 
-### Keycloak is the identity provider
+### Keycloak как провайдер идентификации
 
-Auth is delegated to **Keycloak**, not self-issued. `docker-compose.yml`'s `keycloak` service imports `docker/keycloak/realm-export.json` on every start (`start-dev --import-realm`) — that file is the source of truth for the realm (`cargoservice`), its 5 realm roles (matching `IdentityService.Domain.Enums.Role`), and the `identity-service` confidential client (service account with `manage-users` on `realm-management`, `directAccessGrantsEnabled` for a future ROPC login proxy). Edit that JSON, not the admin console, to change realm/client config — console changes don't survive a container recreate.
+Аутентификация делегирована **Keycloak**, а не выпускается сервисом самостоятельно. Сервис `keycloak` в `docker-compose.yml` импортирует `docker/keycloak/realm-export.json` при каждом старте (`start-dev --import-realm`) — этот файл является источником истины для realm (`cargoservice`), его 5 realm-ролей (соответствуют `IdentityService.Domain.Enums.Role`) и confidential-клиента `identity-service` (service account с ролью `manage-users` на `realm-management`, `directAccessGrantsEnabled` — для будущего прокси-логина через ROPC). Правки realm/клиента вносятся в этот JSON, а не через админ-консоль — изменения из консоли не переживают пересоздание контейнера.
 
-- **Token validation** (`Program.cs`): `AddJwtBearer` uses `Keycloak:BaseUrl`/`Realm`/`ClientId` to build the OIDC metadata address and validates against `Keycloak:ValidIssuer`. These are deliberately separate: `BaseUrl` is whatever URL actually reaches Keycloak over HTTP (`http://localhost:8080` locally, overridden to `http://keycloak:8080` via the `Keycloak__BaseUrl` env var when both run in `docker-compose`), while `ValidIssuer` is always `http://localhost:8080/realms/cargoservice` because that's what `KC_HOSTNAME: localhost` (in `docker-compose.yml`) stamps into every token's `iss` claim regardless of how it was reached. If you ever change `KC_HOSTNAME`, `ValidIssuer` must change with it.
-- **Role claims**: Keycloak puts realm roles in a `realm_access.roles` JSON claim, not individual claims. An `OnTokenValidated` handler in `Program.cs` copies the ones matching the `Role` enum onto `ClaimTypes.Role` so `[Authorize(Roles = ...)]` works normally.
-- **User provisioning**: `IIdentityProviderClient` (interface in `IdentityService.Application`, implementation `KeycloakIdentityProviderClient` in `IdentityService.Infrastructure/Keycloak/`) creates the user in Keycloak via the Admin REST API (client-credentials grant using the service account) and assigns the realm role. `UsersService.CreateUserAsync` calls it *before* writing the local row, using the id Keycloak generates as `User.Id` — so an identity-service `User.Id` and the Keycloak user id are always the same GUID. There's no rollback if the local DB write fails after the Keycloak call succeeds (orphaned Keycloak user) — acceptable for now, revisit if it becomes a real problem.
-- `POST api/users/register` stays `[AllowAnonymous]` and always creates a `Client`; `POST api/users/staff` (`Admin`-only) is how non-Client accounts get created — both go through the same Keycloak-provisioning path.
+- **Валидация токена** (`Program.cs`): `AddJwtBearer` использует `Keycloak:BaseUrl`/`Realm`/`ClientId` для построения адреса OIDC-метаданных и валидирует токен против `Keycloak:ValidIssuer`. Эти значения намеренно разделены: `BaseUrl` — это любой URL, по которому реально можно достучаться до Keycloak по HTTP (`http://localhost:8080` локально, переопределяется на `http://keycloak:8080` через переменную окружения `Keycloak__BaseUrl`, когда оба сервиса работают в `docker-compose`), тогда как `ValidIssuer` всегда равен `http://localhost:8080/realms/cargoservice`, потому что именно это значение `KC_HOSTNAME: localhost` (в `docker-compose.yml`) прописывает в claim `iss` каждого токена независимо от того, как до Keycloak достучались. Если когда-нибудь измените `KC_HOSTNAME`, `ValidIssuer` нужно менять вместе с ним.
+- **Claim-ы ролей**: Keycloak кладёт realm-роли в JSON-claim `realm_access.roles`, а не в отдельные claim-ы. Обработчик `OnTokenValidated` в `Program.cs` копирует те роли, что совпадают с enum `Role`, в `ClaimTypes.Role`, чтобы `[Authorize(Roles = ...)]` работал как обычно.
+- **Провижининг пользователей**: `IIdentityProviderClient` (интерфейс в `IdentityService.Application`, реализация `KeycloakIdentityProviderClient` в `IdentityService.Infrastructure/Keycloak/`) создаёт пользователя в Keycloak через Admin REST API (client-credentials grant с использованием service account) и назначает realm-роль. `UsersService.CreateUserAsync` вызывает его *до* записи локальной строки, используя id, сгенерированный Keycloak, как `User.Id` — так что `User.Id` в identity-service и id пользователя в Keycloak всегда совпадают (это один и тот же GUID). Отката нет, если локальная запись в БД падает после успешного вызова Keycloak (пользователь-сирота в Keycloak) — приемлемо на данном этапе, вернуться к этому, если станет реальной проблемой.
+- `POST api/users/register` остаётся `[AllowAnonymous]` и всегда создаёт `Client`; `POST api/users/staff` (только `Admin`) — способ создать аккаунт не-клиента — оба идут через один и тот же путь провижининга в Keycloak.
 
-`AuthController` (`[AllowAnonymous]`) proxies to Keycloak's token endpoint via `IIdentityProviderClient`, both returning `{ accessToken, refreshToken, expiresIn, tokenType }` or `401`: `POST api/auth/login` (`AuthenticateAsync`, ROPC grant) and `POST api/auth/refresh` (`RefreshAsync`, `grant_type=refresh_token`). For manual testing, the seeded `admin@cargoservice.local` / `admin` user from `realm-export.json` works against `login`.
+`AuthController` (`[AllowAnonymous]`) проксирует запросы к token endpoint Keycloak через `IIdentityProviderClient`, оба метода возвращают `{ accessToken, refreshToken, expiresIn, tokenType }` либо `401`: `POST api/auth/login` (`AuthenticateAsync`, ROPC grant) и `POST api/auth/refresh` (`RefreshAsync`, `grant_type=refresh_token`). Для ручного тестирования подходит засеянный пользователь `admin@cargoservice.local` / `admin` из `realm-export.json` — против `login`.
 
-### Publishing events: transactional outbox
+### Публикация событий: транзакционный outbox
 
-`UsersService.CreateUserAsync` publishes `CargoService.Contracts.Events.V1.UserRegistered` — but only when `user.Role == Role.Client` (self-registration), not for `api/users/staff`-created accounts, since the event exists for clients-service to auto-create a `ClientAccount` and staff aren't clients.
+`UsersService.CreateUserAsync` публикует `CargoService.Contracts.Events.V1.UserRegistered` — но только когда `user.Role == Role.Client` (самостоятельная регистрация), не для аккаунтов, созданных через `api/users/staff`, поскольку событие существует для того, чтобы clients-service автоматически создавал `ClientAccount`, а сотрудники не являются клиентами.
 
-The write path is split across two Application ports, both implemented in `IdentityService.Persistence/Outbox/` against the same `AppDbContext`:
-- `IOutboxWriter.Enqueue(...)` — called by `UsersService` *before* `usersRepository.CreateAsync(user, ...)`. It only stages an `OutboxMessage` row on the DbContext (no `SaveChanges`); the repository call right after it does the actual `SaveChangesAsync`, which — because both go through the same scoped `AppDbContext` instance — commits the `User` insert and the `OutboxMessage` insert in one DB transaction. This ordering (enqueue, then let the next repository call save) is the whole trick and is easy to break by accident; there's no compiler-enforced unit-of-work here.
-- `IOutboxReader` (`GetPendingAsync`/`MarkProcessedAsync`) — used by the dispatcher below, not by request-handling code.
+Путь записи разделён на два порта Application, оба реализованы в `IdentityService.Persistence/Outbox/` поверх одного и того же `AppDbContext`:
+- `IOutboxWriter.Enqueue(...)` — вызывается `UsersService` *до* `usersRepository.CreateAsync(user, ...)`. Он только ставит строку `OutboxMessage` в очередь на уровне DbContext (без `SaveChanges`); следующий сразу за ним вызов репозитория делает реальный `SaveChangesAsync`, который — поскольку оба идут через один и тот же scoped-экземпляр `AppDbContext` — коммитит вставку `User` и вставку `OutboxMessage` в одной транзакции БД. Этот порядок (сначала enqueue, затем позволить следующему вызову репозитория сохранить) — вся суть трюка, и его легко случайно сломать; компилятор здесь unit-of-work не защищает.
+- `IOutboxReader` (`GetPendingAsync`/`MarkProcessedAsync`) — используется диспетчером ниже, а не кодом обработки запросов.
 
-`IdentityService.Infrastructure/Outbox/OutboxDispatcher.cs` is a `BackgroundService` (registered via `AddHostedService` in `AddInfrastructure`) that polls `IOutboxReader` every 5s, publishes pending rows to `RabbitMqConventions.EventsExchange` (topic exchange `cargoservice.events`) using each row's precomputed routing key (`RabbitMqConventions.RoutingKey("identity-service", nameof(UserRegistered))` → `identity-service.user-registered`), and marks them processed. If RabbitMQ is unreachable or the connection drops, the whole connect+poll loop is retried after 10s rather than crashing the host — an unhandled exception in a `BackgroundService` otherwise takes the whole app down by default. RabbitMQ connection settings come from the `RabbitMQ` config section / `RabbitMQ__HostName` env var override in `docker-compose.yml` (same override pattern as `ConnectionStrings`/`Seq`/`Keycloak`).
+`IdentityService.Infrastructure/Outbox/OutboxDispatcher.cs` — это `BackgroundService` (регистрируется через `AddHostedService` в `AddInfrastructure`), который опрашивает `IOutboxReader` каждые 5с, публикует накопленные строки в `RabbitMqConventions.EventsExchange` (topic-exchange `cargoservice.events`), используя предвычисленный routing key каждой строки (`RabbitMqConventions.RoutingKey("identity-service", nameof(UserRegistered))` → `identity-service.user-registered`), и помечает их обработанными. Если RabbitMQ недоступен или соединение обрывается, весь цикл подключения+опроса повторяется через 10с вместо падения хоста — необработанное исключение в `BackgroundService` иначе по умолчанию роняет всё приложение. Настройки подключения к RabbitMQ берутся из секции конфигурации `RabbitMQ` / переопределения переменной окружения `RabbitMQ__HostName` в `docker-compose.yml` (тот же паттерн переопределения, что у `ConnectionStrings`/`Seq`/`Keycloak`).
 
-Nothing currently consumes `identity-service.user-registered` — that's clients-service, not built yet (see spec.md Фаза 2).
+Сейчас никто не потребляет `identity-service.user-registered` — это должен делать clients-service, который ещё не построен (см. spec.md, Фаза 2).
 
-## Commands
+## Команды
 
-Build/run the identity-service (from `services/identity-service/`):
+Сборка/запуск identity-service (из `services/identity-service/`):
 ```
 dotnet build IdentityService.slnx
 dotnet run --project IdentityService
 ```
 
-Full local stack (Postgres + RabbitMQ + MinIO + Seq + Keycloak + identity-service API), from repo root:
+Полный локальный стек (Postgres + RabbitMQ + MinIO + Seq + Keycloak + API identity-service), из корня репозитория:
 ```
 docker compose up --build
 ```
-`docker-compose.override.yml` is picked up automatically (no `-f` needed) and runs the service via the Dockerfile's `dev` stage (`dotnet watch`, source bind-mounted) instead of the published `final` image — edits to `.cs` files under `services/identity-service/` (or `shared/CargoService.Contracts/`) hot-reload inside the container. Each service's `dev` stage/override entry is added alongside its `Dockerfile` as that service gets built.
+`docker-compose.override.yml` подхватывается автоматически (без `-f`) и запускает сервис через dev-стадию Dockerfile (`dotnet watch`, исходники смонтированы как volume) вместо опубликованного `final`-образа — правки в `.cs`-файлах под `services/identity-service/` (или `shared/CargoService.Contracts/`) подхватываются в контейнере без пересборки. dev-стадия/override-запись для каждого сервиса добавляется вместе с его `Dockerfile` по мере реализации.
 
-`services/identity-service/Dockerfile`'s build context is the **repo root** (`docker-compose.yml`'s `build.context: .`, `dockerfile: services/identity-service/Dockerfile`), not `services/identity-service/` itself — `IdentityService.Application` references `shared/CargoService.Contracts`, which lives outside the service's own folder and would otherwise be unreachable by Docker. Same reasoning for the `dev` stage's bind mount in `docker-compose.override.yml`: it mounts the whole repo root (`.:/src`), not just `services/identity-service/`, so `shared/CargoService.Contracts` is visible for `dotnet watch` too. If you add a service whose Dockerfile only needs its own folder (no shared-project dependency), a narrower per-service context is simpler and fine — this repo-root pattern is only necessary because of the Contracts dependency.
+Контекст сборки `services/identity-service/Dockerfile` — **корень репозитория** (`build.context: .` в `docker-compose.yml`, `dockerfile: services/identity-service/Dockerfile`), а не сам `services/identity-service/` — `IdentityService.Application` ссылается на `shared/CargoService.Contracts`, которая лежит вне папки сервиса и иначе была бы недостижима для Docker. Та же причина у bind-mount dev-стадии в `docker-compose.override.yml`: он монтирует весь корень репозитория (`.:/src`), а не только `services/identity-service/`, чтобы `shared/CargoService.Contracts` тоже была видна для `dotnet watch`. Если добавите сервис, чей Dockerfile нуждается только в собственной папке (без зависимости на shared-проект), более узкий контекст на сервис проще и вполне подходит — паттерн «весь корень репозитория» нужен только из-за зависимости на Contracts.
 
-EF Core migrations (run from `services/identity-service/IdentityService.Persistence/`):
+EF Core-миграции (запускаются из `services/identity-service/IdentityService.Persistence/`):
 ```
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```
-No `--startup-project` needed — `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) lets `dotnet ef` build an `AppDbContext` directly instead of building the whole `IdentityService` host, which would otherwise also run (and need valid config for) the Keycloak/RabbitMQ setup in `Program.cs`. The factory reads the connection string from the `ConnectionStrings__DefaultConnection` env var, falling back to the same local-Postgres default as `appsettings.json`. `AddPersistence` (the runtime registration) and the factory both enable `EnableRetryOnFailure()` on the Npgsql provider.
+`--startup-project` не нужен — `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) позволяет `dotnet ef` строить `AppDbContext` напрямую вместо сборки всего хоста `IdentityService`, который иначе также запускал бы (и требовал бы валидной конфигурации для) настройку Keycloak/RabbitMQ в `Program.cs`. Фабрика читает строку подключения из переменной окружения `ConnectionStrings__DefaultConnection`, откатываясь к тому же локальному дефолту Postgres, что и `appsettings.json`. `AddPersistence` (регистрация времени выполнения) и фабрика — оба включают `EnableRetryOnFailure()` на провайдере Npgsql.
 
-## Tests
+## Тесты
 
-`services/identity-service/IdentityService.Application.Tests/` — xUnit + Moq unit tests for `UsersService` (mocks `IUsersRepository`/`IIdentityProviderClient`/`IOutboxWriter`; covers id assignment from the identity provider, the Client-only outbox enqueue rule, update/delete delegation).
+`services/identity-service/IdentityService.Application.Tests/` — unit-тесты на xUnit + Moq для `UsersService` (мокает `IUsersRepository`/`IIdentityProviderClient`/`IOutboxWriter`; покрывает присвоение id от провайдера идентификации, правило постановки в outbox только для роли Client, делегирование update/delete).
 
-`services/identity-service/IdentityService.IntegrationTests/` — xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers, exercising the real API over a disposable Postgres container (`IdentityApiFactory`, one container per test class via `IClassFixture`). Two stand-ins replace things a real deployment would need but these tests don't provision: `FakeIdentityProviderClient` (no real Keycloak) and `TestAuthHandler` (reads a comma-separated `X-Test-Roles` request header instead of validating a real JWT; becomes the default auth scheme via `ConfigureTestServices`, overriding `Program.cs`'s `AddJwtBearer`). The outbox dispatcher's `IHostedService` is removed in tests too — no RabbitMQ container. Tests assert on HTTP status codes and, via a second `AppDbContext` pointed at the same container, directly on `Users`/`OutboxMessages` rows (e.g. registering a `Client` both creates the user row and enqueues exactly one outbox row with routing key `identity-service.user-registered`; creating staff does not).
+`services/identity-service/IdentityService.IntegrationTests/` — xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers, гоняет реальный API поверх одноразового контейнера Postgres (`IdentityApiFactory`, один контейнер на тестовый класс через `IClassFixture`). Два заменителя подставляются вместо того, что нужно реальному деплою, но эти тесты не разворачивают: `FakeIdentityProviderClient` (без реального Keycloak) и `TestAuthHandler` (читает заголовок запроса `X-Test-Roles` через запятую вместо валидации настоящего JWT; становится дефолтной auth-схемой через `ConfigureTestServices`, переопределяя `AddJwtBearer` из `Program.cs`). `IHostedService` диспетчера outbox в тестах тоже убран — контейнер RabbitMQ не нужен. Тесты проверяют HTTP-статус-коды и, через второй `AppDbContext`, указывающий на тот же контейнер, напрямую строки `Users`/`OutboxMessages` (например, регистрация `Client` создаёт и строку пользователя, и ровно одну строку outbox с routing key `identity-service.user-registered`; создание сотрудника — нет).
 
 ```
-dotnet test IdentityService.Application.Tests   # no external dependencies
-dotnet test IdentityService.IntegrationTests    # needs a running Docker daemon (Testcontainers)
+dotnet test IdentityService.Application.Tests   # без внешних зависимостей
+dotnet test IdentityService.IntegrationTests    # нужен запущенный Docker-демон (Testcontainers)
 ```
