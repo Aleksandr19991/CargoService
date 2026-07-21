@@ -2,11 +2,15 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
+using FluentValidation;
+using IdentityService.API.Filters;
 using IdentityService.Application.Configuration;
 using IdentityService.Domain.Enums;
 using IdentityService.Infrastructure.Configuration;
 using IdentityService.Persistence;
 using IdentityService.Persistence.Configuration;
+using Mapster;
+using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -30,10 +34,15 @@ builder.Host.UseSerilog((context, services, configuration) =>
 
 // Add services to the container.
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<ValidationFilter>())
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Request DTO validation (FluentValidation) — validators are picked up by ValidationFilter above,
+// no per-action wiring needed. Object↔DTO mapping (Mapster) — configured in Mapping/MappingRegister.cs.
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddMapster();
 
 var configuration = builder.Configuration;
 var connectionString = configuration.GetConnectionString("DefaultConnection")

@@ -1,17 +1,18 @@
-﻿using IdentityService.API.Models.Requests;
+using IdentityService.API.Models.Requests;
 using IdentityService.API.Models.Responses;
 using IdentityService.Application.Interfaces;
 using IdentityService.Domain.Entities;
 using IdentityService.Domain.Enums;
+using MapsterMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityService;
+namespace IdentityService.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
 [Authorize]
-public class UsersController(IUsersService usersService) : ControllerBase
+public class UsersController(IUsersService usersService, IMapper mapper) : ControllerBase
 {
     [HttpPost("register")]
     [AllowAnonymous]
@@ -19,17 +20,9 @@ public class UsersController(IUsersService usersService) : ControllerBase
         [FromBody] RegisterUserRequest request,
         CancellationToken cancellationToken)
     {
-        var user = new User
-        {
-            Name = request.Name,
-            LastName = request.LastName,
-            Phone = request.Phone,
-            Email = request.Email,
-            Role = Role.Client
-        };
-
+        var user = mapper.Map<User>(request);
         var createdUser = await usersService.CreateUserAsync(user, request.Password, cancellationToken);
-        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, MapToResponse(createdUser));
+        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, mapper.Map<UserResponse>(createdUser));
     }
 
     [HttpPost("staff")]
@@ -38,17 +31,9 @@ public class UsersController(IUsersService usersService) : ControllerBase
         [FromBody] CreateStaffUserRequest request,
         CancellationToken cancellationToken)
     {
-        var user = new User
-        {
-            Name = request.Name,
-            LastName = request.LastName,
-            Phone = request.Phone,
-            Email = request.Email,
-            Role = request.Role
-        };
-
+        var user = mapper.Map<User>(request);
         var createdUser = await usersService.CreateUserAsync(user, request.Password, cancellationToken);
-        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, MapToResponse(createdUser));
+        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, mapper.Map<UserResponse>(createdUser));
     }
 
     [HttpPut("{id}")]
@@ -58,15 +43,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
         [FromBody] UpdateUserRequest request,
         CancellationToken cancellationToken)
     {
-        var user = new User
-        {
-            Name = request.Name,
-            LastName = request.LastName,
-            Phone = request.Phone,
-            Email = request.Email,
-            IsDeactivated = false
-        };
-
+        var user = mapper.Map<User>(request);
         var updated = await usersService.UpdateUserAsync(id, user, cancellationToken);
         if (!updated)
             return NotFound();
@@ -90,7 +67,7 @@ public class UsersController(IUsersService usersService) : ControllerBase
     public async Task<ActionResult<List<UserResponse>>> GetAllUsers(CancellationToken cancellationToken)
     {
         var users = await usersService.GetAllUsersAsync(cancellationToken);
-        return Ok(users.Select(MapToResponse).ToList());
+        return Ok(mapper.Map<List<UserResponse>>(users));
     }
 
     [HttpGet("{id}")]
@@ -101,17 +78,6 @@ public class UsersController(IUsersService usersService) : ControllerBase
         if (user is null)
             return NotFound();
 
-        return Ok(MapToResponse(user));
+        return Ok(mapper.Map<UserResponse>(user));
     }
-
-    private static UserResponse MapToResponse(User user) => new()
-    {
-        Id = user.Id,
-        Name = user.Name,
-        LastName = user.LastName,
-        Phone = user.Phone,
-        Email = user.Email,
-        Role = user.Role,
-        IsDeactivated = user.IsDeactivated
-    };
 }

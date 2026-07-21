@@ -1,15 +1,16 @@
 using IdentityService.API.Models.Requests;
 using IdentityService.API.Models.Responses;
 using IdentityService.Application.Interfaces;
+using MapsterMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace IdentityService;
+namespace IdentityService.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
 [Authorize]
-public class AuthController(IIdentityProviderClient identityProviderClient) : ControllerBase
+public class AuthController(IIdentityProviderClient identityProviderClient, IMapper mapper) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -21,13 +22,7 @@ public class AuthController(IIdentityProviderClient identityProviderClient) : Co
         if (token is null)
             return Unauthorized();
 
-        return Ok(new LoginResponse
-        {
-            AccessToken = token.AccessToken,
-            RefreshToken = token.RefreshToken,
-            ExpiresIn = token.ExpiresIn,
-            TokenType = token.TokenType
-        });
+        return Ok(mapper.Map<LoginResponse>(token));
     }
 
     [HttpPost("refresh")]
@@ -40,12 +35,6 @@ public class AuthController(IIdentityProviderClient identityProviderClient) : Co
         if (token is null)
             return Unauthorized();
 
-        return Ok(new LoginResponse
-        {
-            AccessToken = token.AccessToken,
-            RefreshToken = token.RefreshToken,
-            ExpiresIn = token.ExpiresIn,
-            TokenType = token.TokenType
-        });
+        return Ok(mapper.Map<LoginResponse>(token));
     }
 }

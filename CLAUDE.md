@@ -39,6 +39,16 @@ Directory.Packages.props     централизованное управлени
 
 Проекты: `IdentityService.Domain`, `IdentityService.Application`, `IdentityService.Infrastructure`, `IdentityService.Persistence`, `IdentityService` (API/хост). Текущий охват: CRUD над одной сущностью `User` (регистрация/обновление/удаление/получение по id/получение всех) через `UsersController` на `api/users`. У `User` нет поля пароля — учётные данные целиком живут в Keycloak (см. ниже).
 
+### API-слой: контроллеры, маппинг, валидация
+
+Конвенция для `IdentityService` (API-проект), обязательная для любого нового эндпоинта:
+
+- **Контроллеры** — только в `Controllers/`, namespace `IdentityService.API.Controllers`. Никаких контроллеров в корне проекта.
+- **Маппинг** — только через **Mapster** (`IMapper`/`MapsterMapper`, внедряется в конструктор контроллера), в контроллере не должно быть ручного `new User { ... }` или `new SomethingResponse { ... }`. Все конфигурации маппинга — в `Mapping/MappingRegister.cs` (класс, реализующий `IRegister`), который подхватывается автоматически через `builder.Services.AddMapster()` в `Program.cs` (Mapster сканирует сборку на реализации `IRegister`). Для DTO/сущностей, где имена свойств совпадают, отдельная конфигурация в `MappingRegister` не обязательна для работы маппинга, но запись `config.NewConfig<TSource, TDestination>()` всё равно добавляется явно — так все пары маппинга видны в одном месте и легко расширяются, если понадобится кастомная логика.
+- **Валидация** — только через **FluentValidation**. На каждый request-DTO — свой `AbstractValidator<TRequest>` в `Validators/`. Ничего вызывать вручную в контроллере не нужно: `ValidationFilter` (`Filters/ValidationFilter.cs`, зарегистрирован глобально через `options.Filters.Add<ValidationFilter>()` в `AddControllers(...)`) проверяет каждый аргумент действия, для типа которого в DI зарегистрирован `IValidator<T>`, и при ошибке сразу возвращает `400` с `ValidationProblemDetails` — до входа в тело метода контроллера. Валидаторы регистрируются автоматически через `builder.Services.AddValidatorsFromAssemblyContaining<Program>()`.
+
+Практическое следствие: чтобы добавить новый эндпоинт с телом запроса, обычно не нужно писать ничего вручную ни для маппинга, ни для валидации — только: DTO, `AbstractValidator` на 3–5 строк, запись в `MappingRegister`, и сам метод контроллера, который просто вызывает `mapper.Map<...>()`. Актуальный скилл для этого — `.claude/skills/add-identity-endpoint/SKILL.md`.
+
 ### Keycloak как провайдер идентификации
 
 Аутентификация делегирована **Keycloak**, а не выпускается сервисом самостоятельно. Сервис `keycloak` в `docker-compose.yml` импортирует `docker/keycloak/realm-export.json` при каждом старте (`start-dev --import-realm`) — этот файл является источником истины для realm (`cargoservice`), его 5 realm-ролей (соответствуют `IdentityService.Domain.Enums.Role`) и confidential-клиента `identity-service` (service account с ролью `manage-users` на `realm-management`, `directAccessGrantsEnabled` — для будущего прокси-логина через ROPC). Правки realm/клиента вносятся в этот JSON, а не через админ-консоль — изменения из консоли не переживают пересоздание контейнера.
