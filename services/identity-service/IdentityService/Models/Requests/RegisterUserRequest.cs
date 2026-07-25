@@ -1,10 +1,10 @@
-﻿namespace IdentityService.API.Models.Requests;
+namespace IdentityService.API.Models.Requests;
 
-public class RegisterUserRequest
+public sealed record RegisterUserRequest
 {
-    public string Name { get; set; }
-    public string LastName { get; set; }
-    public string Phone { get; set; }
-    public string Email { get; set; }
-    public string Password { get; set; }
+    public required string Name { get; init; }
+    public required string LastName { get; init; }
+    public required string Phone { get; init; }
+    public required string Email { get; init; }
+    public required string Password { get; init; }
 }

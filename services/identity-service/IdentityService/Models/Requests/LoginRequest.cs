@@ -1,7 +1,7 @@
 namespace IdentityService.API.Models.Requests;
 
-public class LoginRequest
+public sealed record LoginRequest
 {
-    public string Email { get; set; }
-    public string Password { get; set; }
+    public required string Email { get; init; }
+    public required string Password { get; init; }
 }

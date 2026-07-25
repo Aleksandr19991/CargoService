@@ -1,14 +1,14 @@
-﻿using IdentityService.Domain.Enums;
+using IdentityService.Domain.Enums;
 
 namespace IdentityService.API.Models.Responses;
 
-public class UserResponse
+public sealed record UserResponse
 {
-    public Guid Id { get; set; }
-    public string Name { get; set; }
-    public string LastName { get; set; }
-    public string Phone { get; set; }
-    public string Email { get; set; }
-    public Role Role { get; set; }
-    public bool IsDeactivated { get; set; }
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string LastName { get; init; }
+    public required string Phone { get; init; }
+    public required string Email { get; init; }
+    public required Role Role { get; init; }
+    public required bool IsDeactivated { get; init; }
 }

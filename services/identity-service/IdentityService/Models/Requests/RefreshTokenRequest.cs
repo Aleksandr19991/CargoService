@@ -1,6 +1,6 @@
 namespace IdentityService.API.Models.Requests;
 
-public class RefreshTokenRequest
+public sealed record RefreshTokenRequest
 {
-    public string RefreshToken { get; set; }
+    public required string RefreshToken { get; init; }
 }

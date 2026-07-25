@@ -1,9 +1,9 @@
-﻿namespace IdentityService.API.Models.Requests;
+namespace IdentityService.API.Models.Requests;
 
-public class UpdateUserRequest
+public sealed record UpdateUserRequest
 {
-    public string Name { get; set; }
-    public string LastName { get; set; }
-    public string Phone { get; set; }
-    public string Email { get; set; }
+    public required string Name { get; init; }
+    public required string LastName { get; init; }
+    public required string Phone { get; init; }
+    public required string Email { get; init; }
 }

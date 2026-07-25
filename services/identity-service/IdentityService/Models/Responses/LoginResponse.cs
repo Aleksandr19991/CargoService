@@ -1,9 +1,9 @@
 namespace IdentityService.API.Models.Responses;
 
-public class LoginResponse
+public sealed record LoginResponse
 {
-    public string AccessToken { get; set; }
-    public string RefreshToken { get; set; }
-    public int ExpiresIn { get; set; }
-    public string TokenType { get; set; }
+    public required string AccessToken { get; init; }
+    public required string RefreshToken { get; init; }
+    public required int ExpiresIn { get; init; }
+    public required string TokenType { get; init; }
 }
