@@ -30,7 +30,7 @@ description: Scaffolds a new HTTP endpoint in services/identity-service/Identity
 - `services/identity-service/IdentityService/Mapping/MappingRegister.cs` — все пары маппинга сервиса, одним файлом.
 - `services/identity-service/IdentityService/Filters/ValidationFilter.cs` — как работает автоматическая валидация (для справки, обычно не требует изменений).
 - `services/identity-service/IdentityService/Validators/RegisterUserRequestValidator.cs` — эталонный validator.
-- `services/identity-service/IdentityService/Program.cs` — где зарегистрированы `AddMapster()`, `AddValidatorsFromAssemblyContaining<Program>()` и `options.Filters.Add<ValidationFilter>()` (трогать не нужно, если это не первый эндпоинт в новом сервисе).
+- `services/identity-service/IdentityService/Configuration/ServicesConfiguration.cs` — `AddApiServices()`, где зарегистрированы `AddMapster()`, `AddValidatorsFromAssemblyContaining<Program>()` и `options.Filters.AddValidationFilter()` (трогать не нужно, если это не первый эндпоинт в новом сервисе). `Program.cs` в identity-service держится коротким и просто вызывает такие extension-методы — не добавляй регистрации инлайном туда, заводи/дополняй extension-метод в `Configuration/`.
 
 ## Шаблоны
 
@@ -103,4 +103,4 @@ public async Task<ActionResult<{Action}Response>> {Action}(
 
 Не создаёт бизнес-логику в `IdentityService.Application`/`IdentityService.Persistence` — если новому эндпоинту нужен новый метод сервиса, новый метод репозитория или новая миграция EF Core, это отдельная задача уровня Application/Persistence, а не API-слоя. Этот скилл покрывает только контроллер + DTO + валидацию + маппинг вокруг уже существующей или тривиально добавляемой бизнес-операции.
 
-Если делаешь такой же эндпоинт в другом сервисе (не identity-service), который ещё не завёл `Mapping/`, `Validators/`, `Filters/ValidationFilter.cs` и регистрацию `AddMapster()`/`AddValidatorsFromAssemblyContaining<Program>()` в своём `Program.cs` — сначала перенеси туда эту инфраструктуру (скопировав из identity-service), а не изобретай альтернативный способ мапить/валидировать для одного сервиса.
+Если делаешь такой же эндпоинт в другом сервисе (не identity-service), который ещё не завёл `Mapping/`, `Validators/`, `Filters/ValidationFilter.cs` и свой `Configuration/ServicesConfiguration.cs` с `AddApiServices()` — сначала перенеси туда эту инфраструктуру (скопировав из identity-service), а не изобретай альтернативный способ мапить/валидировать для одного сервиса.

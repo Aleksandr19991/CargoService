@@ -6,9 +6,9 @@ namespace IdentityService.API.Filters;
 
 /// <summary>
 /// Validates every action argument that has a registered FluentValidation <see cref="IValidator{T}"/>
-/// before the action runs. Adding an <c>AbstractValidator&lt;TRequest&gt;</c> for a request DTO is
+/// before the action runs. Adding an AbstractValidator<TRequest> for a request DTO is
 /// enough to enforce it — no per-action validation code needed. Registered globally in Program.cs
-/// via <c>options.Filters.Add&lt;ValidationFilter&gt;()</c>.
+/// via options.Filters.AddValidationFilter().
 /// </summary>
 public class ValidationFilter : IAsyncActionFilter
 {
@@ -39,5 +39,14 @@ public class ValidationFilter : IAsyncActionFilter
         }
 
         await next();
+    }
+}
+
+public static class ValidationFilterExtensions
+{
+    public static FilterCollection AddValidationFilter(this FilterCollection filters)
+    {
+        filters.Add<ValidationFilter>();
+        return filters;
     }
 }
