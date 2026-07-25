@@ -135,6 +135,87 @@ public class UsersControllerTests(IdentityApiFactory factory) : IClassFixture<Id
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ChangeUserRole_AdminRole_UpdatesRoleInDatabase()
+    {
+        var adminClient = factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, nameof(Role.Admin));
+        var email = $"{Guid.NewGuid()}@example.com";
+
+        var createResponse = await adminClient.PostAsJsonAsync("api/users/staff", new CreateStaffUserRequest
+        {
+            Name = "Warehouse",
+            LastName = "Op",
+            Phone = "+1000000",
+            Email = email,
+            Password = "s3cret",
+            Role = Role.WarehouseOperator,
+        });
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
+
+        var response = await adminClient.PutAsJsonAsync(
+            $"api/users/{createdUser!.Id}/role", new ChangeUserRoleRequest { Role = Role.Manager });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.Equal(Role.Manager, body!.Role);
+
+        await using var context = CreateDbContext();
+        var storedUser = await context.Users.SingleAsync(u => u.Id == createdUser.Id);
+        Assert.Equal(Role.Manager, storedUser.Role);
+    }
+
+    [Fact]
+    public async Task ChangeUserRole_ManagerRole_UpdatesRoleInDatabase()
+    {
+        var adminClient = factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, nameof(Role.Admin));
+        var email = $"{Guid.NewGuid()}@example.com";
+
+        var createResponse = await adminClient.PostAsJsonAsync("api/users/staff", new CreateStaffUserRequest
+        {
+            Name = "Warehouse",
+            LastName = "Op",
+            Phone = "+1000000",
+            Email = email,
+            Password = "s3cret",
+            Role = Role.WarehouseOperator,
+        });
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<UserResponse>();
+
+        var managerClient = factory.CreateClient();
+        managerClient.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, nameof(Role.Manager));
+
+        var response = await managerClient.PutAsJsonAsync(
+            $"api/users/{createdUser!.Id}/role", new ChangeUserRoleRequest { Role = Role.Manager });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRole_ClientRole_ReturnsForbidden()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, nameof(Role.Client));
+
+        var response = await client.PutAsJsonAsync(
+            $"api/users/{Guid.NewGuid()}/role", new ChangeUserRoleRequest { Role = Role.Manager });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRole_UnknownUser_ReturnsNotFound()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, nameof(Role.Admin));
+
+        var response = await client.PutAsJsonAsync(
+            $"api/users/{Guid.NewGuid()}/role", new ChangeUserRoleRequest { Role = Role.Manager });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

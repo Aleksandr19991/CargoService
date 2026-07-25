@@ -51,6 +51,20 @@ public class UsersController(IUsersService usersService, IMapper mapper) : Contr
         return NoContent();
     }
 
+    [HttpPut("{id}/role")]
+    [Authorize(Roles = $"{nameof(Role.Admin)},{nameof(Role.Manager)}")]
+    public async Task<ActionResult<UserResponse>> ChangeUserRole(
+        [FromRoute] Guid id,
+        [FromBody] ChangeUserRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updatedUser = await usersService.ChangeUserRoleAsync(id, request.Role, cancellationToken);
+        if (updatedUser is null)
+            return NotFound();
+
+        return Ok(mapper.Map<UserResponse>(updatedUser));
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Roles = nameof(Role.Admin))]
     public async Task<IActionResult> DeleteUser([FromRoute] Guid id, CancellationToken cancellationToken)

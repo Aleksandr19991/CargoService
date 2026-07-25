@@ -71,6 +71,23 @@ public class UsersService(
         return await usersRepository.UpdateAsync(existingUser, cancellationToken);
     }
 
+    public async Task<User?> ChangeUserRoleAsync(Guid id, Role newRole, CancellationToken cancellationToken = default)
+    {
+        var existingUser = await usersRepository.GetByIdAsync(id, cancellationToken);
+        if (existingUser is null)
+            return null;
+
+        if (existingUser.Role == newRole)
+            return existingUser;
+
+        await identityProviderClient.ChangeUserRoleAsync(existingUser.Id, existingUser.Role, newRole, cancellationToken);
+
+        existingUser.Role = newRole;
+        await usersRepository.UpdateAsync(existingUser, cancellationToken);
+
+        return existingUser;
+    }
+
     public Task<bool> DeleteUserAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return usersRepository.DeleteAsync(id, cancellationToken);

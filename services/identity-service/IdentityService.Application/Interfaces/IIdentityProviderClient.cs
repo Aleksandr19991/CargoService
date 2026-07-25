@@ -25,4 +25,11 @@ public interface IIdentityProviderClient
     Task<AuthToken?> RefreshAsync(
         string refreshToken,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Changes an existing user's realm role in the identity provider: removes the old role, assigns the new one.</summary>
+    Task ChangeUserRoleAsync(
+        Guid userId,
+        Role oldRole,
+        Role newRole,
+        CancellationToken cancellationToken = default);
 }

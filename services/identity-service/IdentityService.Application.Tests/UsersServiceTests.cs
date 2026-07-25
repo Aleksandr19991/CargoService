@@ -144,6 +144,71 @@ public class UsersServiceTests
     }
 
     [Fact]
+    public async Task ChangeUserRoleAsync_UserDoesNotExist_ReturnsNull()
+    {
+        _usersRepository
+            .Setup(repository => repository.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        var result = await _sut.ChangeUserRoleAsync(Guid.NewGuid(), Role.Manager);
+
+        Assert.Null(result);
+        _identityProviderClient.Verify(
+            client => client.ChangeUserRoleAsync(
+                It.IsAny<Guid>(), It.IsAny<Role>(), It.IsAny<Role>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _usersRepository.Verify(
+            repository => repository.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_NewRoleMatchesCurrentRole_ReturnsUserWithoutCallingIdentityProvider()
+    {
+        var id = Guid.NewGuid();
+        var existingUser = new User { Id = id, Role = Role.Manager };
+
+        _usersRepository
+            .Setup(repository => repository.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingUser);
+
+        var result = await _sut.ChangeUserRoleAsync(id, Role.Manager);
+
+        Assert.Same(existingUser, result);
+        _identityProviderClient.Verify(
+            client => client.ChangeUserRoleAsync(
+                It.IsAny<Guid>(), It.IsAny<Role>(), It.IsAny<Role>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _usersRepository.Verify(
+            repository => repository.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_RoleChanges_UpdatesIdentityProviderAndRepository()
+    {
+        var id = Guid.NewGuid();
+        var existingUser = new User { Id = id, Role = Role.WarehouseOperator };
+
+        _usersRepository
+            .Setup(repository => repository.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingUser);
+        _usersRepository
+            .Setup(repository => repository.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var result = await _sut.ChangeUserRoleAsync(id, Role.Manager);
+
+        Assert.NotNull(result);
+        Assert.Equal(Role.Manager, result!.Role);
+        _identityProviderClient.Verify(
+            client => client.ChangeUserRoleAsync(id, Role.WarehouseOperator, Role.Manager, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _usersRepository.Verify(
+            repository => repository.UpdateAsync(
+                It.Is<User>(u => u.Id == id && u.Role == Role.Manager), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task DeleteUserAsync_DelegatesToRepository()
     {
         var id = Guid.NewGuid();

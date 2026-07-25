@@ -128,16 +128,38 @@ public class KeycloakIdentityProviderClient(HttpClient httpClient, KeycloakOptio
         return location.Segments[^1].TrimEnd('/');
     }
 
+    public async Task ChangeUserRoleAsync(
+        Guid userId,
+        Role oldRole,
+        Role newRole,
+        CancellationToken cancellationToken = default)
+    {
+        var accessToken = await GetServiceAccountAccessTokenAsync(cancellationToken);
+        var oldRoleRepresentation = await GetRealmRoleRepresentationAsync(accessToken, oldRole, cancellationToken);
+        var newRoleRepresentation = await GetRealmRoleRepresentationAsync(accessToken, newRole, cancellationToken);
+
+        using var removeRequest = new HttpRequestMessage(HttpMethod.Delete, $"{options.AdminApiBaseUrl}/users/{userId}/role-mappings/realm")
+        {
+            Content = JsonContent.Create(new[] { oldRoleRepresentation }),
+        };
+        removeRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var removeResponse = await httpClient.SendAsync(removeRequest, cancellationToken);
+        removeResponse.EnsureSuccessStatusCode();
+
+        using var assignRequest = new HttpRequestMessage(HttpMethod.Post, $"{options.AdminApiBaseUrl}/users/{userId}/role-mappings/realm")
+        {
+            Content = JsonContent.Create(new[] { newRoleRepresentation }),
+        };
+        assignRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var assignResponse = await httpClient.SendAsync(assignRequest, cancellationToken);
+        assignResponse.EnsureSuccessStatusCode();
+    }
+
     private async Task AssignRealmRoleAsync(string accessToken, string userId, Role role, CancellationToken cancellationToken)
     {
-        using var getRoleRequest = new HttpRequestMessage(HttpMethod.Get, $"{options.AdminApiBaseUrl}/roles/{role}");
-        getRoleRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-        using var getRoleResponse = await httpClient.SendAsync(getRoleRequest, cancellationToken);
-        getRoleResponse.EnsureSuccessStatusCode();
-
-        var roleRepresentation = await getRoleResponse.Content.ReadFromJsonAsync<KeycloakRoleRepresentation>(cancellationToken)
-            ?? throw new InvalidOperationException($"Keycloak realm role '{role}' was not found.");
+        var roleRepresentation = await GetRealmRoleRepresentationAsync(accessToken, role, cancellationToken);
 
         using var assignRequest = new HttpRequestMessage(HttpMethod.Post, $"{options.AdminApiBaseUrl}/users/{userId}/role-mappings/realm")
         {
@@ -147,6 +169,18 @@ public class KeycloakIdentityProviderClient(HttpClient httpClient, KeycloakOptio
 
         using var assignResponse = await httpClient.SendAsync(assignRequest, cancellationToken);
         assignResponse.EnsureSuccessStatusCode();
+    }
+
+    private async Task<KeycloakRoleRepresentation> GetRealmRoleRepresentationAsync(string accessToken, Role role, CancellationToken cancellationToken)
+    {
+        using var getRoleRequest = new HttpRequestMessage(HttpMethod.Get, $"{options.AdminApiBaseUrl}/roles/{role}");
+        getRoleRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var getRoleResponse = await httpClient.SendAsync(getRoleRequest, cancellationToken);
+        getRoleResponse.EnsureSuccessStatusCode();
+
+        return await getRoleResponse.Content.ReadFromJsonAsync<KeycloakRoleRepresentation>(cancellationToken)
+            ?? throw new InvalidOperationException($"Keycloak realm role '{role}' was not found.");
     }
 
     private sealed record KeycloakTokenResponse(

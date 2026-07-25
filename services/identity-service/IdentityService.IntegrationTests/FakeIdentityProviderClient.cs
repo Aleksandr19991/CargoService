@@ -35,4 +35,13 @@ public class FakeIdentityProviderClient : IIdentityProviderClient
     {
         return Task.FromResult<AuthToken?>(null);
     }
+
+    public Task ChangeUserRoleAsync(
+        Guid userId,
+        Role oldRole,
+        Role newRole,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
 }
