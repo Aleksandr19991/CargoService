@@ -10,30 +10,28 @@ public static class AuthenticationConfiguration
 {
     public static IServiceCollection AddKeycloakAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        var keycloakSection = configuration.GetSection("Keycloak");
-        var keycloakBaseUrl = keycloakSection["BaseUrl"]
-            ?? throw new InvalidOperationException("Keycloak:BaseUrl is not configured.");
-        var keycloakRealm = keycloakSection["Realm"]
-            ?? throw new InvalidOperationException("Keycloak:Realm is not configured.");
-        var keycloakClientId = keycloakSection["ClientId"]
-            ?? throw new InvalidOperationException("Keycloak:ClientId is not configured.");
-        // The `iss` claim Keycloak stamps into tokens follows KC_HOSTNAME (docker-compose.yml), which is
-        // intentionally kept stable regardless of the URL used above to actually reach Keycloak over HTTP
-        // (localhost from the host, http://keycloak:8080 from inside the compose network) — see CLAUDE.md.
-        var keycloakValidIssuer = keycloakSection["ValidIssuer"]
-            ?? throw new InvalidOperationException("Keycloak:ValidIssuer is not configured.");
+        var keycloak = KeycloakAuthOptions.Bind(configuration);
+        var keycloakBaseUri = new Uri(keycloak.BaseUrl);
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.MetadataAddress = $"{keycloakBaseUrl}/realms/{keycloakRealm}/.well-known/openid-configuration";
+                options.MetadataAddress = keycloak.MetadataAddress;
+                // Keycloak's discovery document advertises jwks_uri using KC_HOSTNAME (same host it
+                // puts in `iss` — see KeycloakAuthOptions.ValidIssuer), which is only reachable from the
+                // host machine, not from inside another container. Without this, the metadata fetch
+                // above succeeds but the follow-up JWKS fetch the framework makes to the *discovered*
+                // jwks_uri fails, and every otherwise-valid token gets rejected with "signature key was
+                // not found". Rewriting every backchannel request onto the URL we know is actually
+                // reachable (keycloak.BaseUrl) sidesteps the mismatch regardless of KC_HOSTNAME's value.
+                options.BackchannelHttpHandler = new KeycloakBackchannelHandler(keycloakBaseUri);
                 options.RequireHttpsMetadata = false;
-                options.Audience = keycloakClientId;
+                options.Audience = keycloak.ClientId;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidIssuer = keycloakValidIssuer,
+                    ValidIssuer = keycloak.ValidIssuer,
                     ValidateAudience = true,
                     ValidateLifetime = true,
                 };
@@ -71,5 +69,21 @@ public static class AuthenticationConfiguration
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>Forces every outgoing metadata/JWKS request onto <paramref name="reachableBaseUri"/>, ignoring whatever host the request was originally addressed to.</summary>
+    private sealed class KeycloakBackchannelHandler(Uri reachableBaseUri) : DelegatingHandler(new HttpClientHandler())
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.RequestUri = new UriBuilder(request.RequestUri!)
+            {
+                Scheme = reachableBaseUri.Scheme,
+                Host = reachableBaseUri.Host,
+                Port = reachableBaseUri.Port,
+            }.Uri;
+
+            return base.SendAsync(request, cancellationToken);
+        }
     }
 }

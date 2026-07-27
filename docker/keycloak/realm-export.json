@@ -47,7 +47,7 @@
       "enabled": true,
       "serviceAccountClientId": "identity-service",
       "clientRoles": {
-        "realm-management": ["manage-users"]
+        "realm-management": ["manage-users", "view-realm"]
       }
     },
     {
