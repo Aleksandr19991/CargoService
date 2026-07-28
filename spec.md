@@ -219,7 +219,7 @@
 - [x] Dockerfile + подключение в docker-compose. Dockerfile и подключение в `docker-compose.yml` были сделаны ещё в Фазе 0, но с тех пор `IdentityService.Application` обзавёлся зависимостью на `shared/CargoService.Contracts` (задача «Outbox»), которая лежит вне `services/identity-service` — старый build-контекст не мог её достать. Контекст сборки перенесён на корень репозитория (Dockerfile/override обновлены), сам образ собрать вживую не удалось (нет Docker-демона в этой среде), но идентичные `dotnet restore`/`dotnet publish` из корня репозитория прошли успешно и подтвердили, что граф проектов резолвится.
 
 ### Фаза 2 — Clients Service (CRM контрагентов)
-- [ ] Создать проект (Domain/Application/Persistence/Infrastructure/API).
+- [x] Создать проект (Domain/Application/Persistence/Infrastructure/API).
 - [ ] Сущности `Counterparty`, `ClientAccount`, миграции PostgreSQL.
 - [ ] CRUD API + поиск по городу/названию/телефону.
 - [ ] Consumer события `UserRegistered` → авто-создание `ClientAccount`.

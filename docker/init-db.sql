@@ -5,3 +5,7 @@ GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
 CREATE USER cargoservice WITH PASSWORD 'cargoservice';
 CREATE DATABASE cargoservice OWNER cargoservice;
 GRANT ALL PRIVILEGES ON DATABASE cargoservice TO cargoservice;
+
+CREATE USER clientsservice WITH PASSWORD 'clientsservice';
+CREATE DATABASE clientsservice OWNER clientsservice;
+GRANT ALL PRIVILEGES ON DATABASE clientsservice TO clientsservice;

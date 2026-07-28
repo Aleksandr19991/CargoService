@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="ClientsService.Application/ClientsService.Application.csproj" />
+  <Project Path="ClientsService.Domain/ClientsService.Domain.csproj" />
+  <Project Path="ClientsService.Infrastructure/ClientsService.Infrastructure.csproj" />
+  <Project Path="ClientsService.Persistence/ClientsService.Persistence.csproj" />
+  <Project Path="ClientsService/ClientsService.API.csproj" />
+</Solution>
