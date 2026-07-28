@@ -19,6 +19,11 @@ public static class ServicesConfiguration
         // Request DTO validation (FluentValidation) — validators are picked up by ValidationFilter,
         // no per-action wiring needed. Object↔DTO mapping (Mapster) — see Mapping/MappingRegister.cs.
         services.AddValidatorsFromAssemblyContaining<Program>();
+
+        // AddMapster()'s own assembly auto-scan does not reach this assembly in practice (verified
+        // empirically — MappingRegister.Register() is never invoked without this explicit call).
+        // Scanning explicitly here is what actually wires up MappingRegister's custom .Map() rules.
+        TypeAdapterConfig.GlobalSettings.Scan(typeof(Program).Assembly);
         services.AddMapster();
 
         return services;
