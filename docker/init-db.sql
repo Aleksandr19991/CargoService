@@ -9,3 +9,7 @@ GRANT ALL PRIVILEGES ON DATABASE cargoservice TO cargoservice;
 CREATE USER clientsservice WITH PASSWORD 'clientsservice';
 CREATE DATABASE clientsservice OWNER clientsservice;
 GRANT ALL PRIVILEGES ON DATABASE clientsservice TO clientsservice;
+
+CREATE USER pricingservice WITH PASSWORD 'pricingservice';
+CREATE DATABASE pricingservice OWNER pricingservice;
+GRANT ALL PRIVILEGES ON DATABASE pricingservice TO pricingservice;

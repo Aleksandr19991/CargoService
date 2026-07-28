@@ -226,7 +226,7 @@
 - [x] Тесты, Dockerfile, docker-compose. Unit-тесты `ClientsService.Application.Tests` (8 тестов) прогнаны и зелёные. Интеграционные тесты `ClientsService.IntegrationTests` написаны по образцу identity-service (Testcontainers, `TestAuthHandler` с доп. заголовком `X-Test-User-Id`), но не запускались вживую в этой среде — Npgsql падает с ошибкой аутентификации против Testcontainers-контейнера Postgres на этой машине; воспроизвели ту же ошибку и на немодифицированных тестах identity-service, значит это окружение-специфичное ограничение (Docker Desktop/Windows), а не баг в коде — прогнать `dotnet test` в другой среде/CI перед тем, как полагаться на них. Сам сервис проверен вживую другим способом: собранный `final`-образ (`docker build --target final`, затем `docker compose up`) поднимается, мигрирует БД и отвечает на `/openapi/v1.json` — через контейнеры на сети `cargoservice_default`, как и остальные задачи Фазы 2.
 
 ### Фаза 3 — Pricing Service
-- [ ] Создать проект по Clean Architecture.
+- [x] Создать проект по Clean Architecture.
 - [ ] Сущность `TariffRate`, seed начальных тарифов (обычная/экспресс, деревянная/паллет/спец. упаковка, забор/доставка, страхование).
 - [ ] Реализовать `POST /pricing/calculate` с бизнес-логикой расчёта (вес/объём/расстояние/услуги).
 - [ ] Admin API для управления тарифами + публикация `TariffChanged`.
