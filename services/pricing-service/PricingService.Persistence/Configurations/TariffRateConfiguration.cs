@@ -1,3 +1,4 @@
+using PricingService.Application;
 using PricingService.Domain.Entities;
 using PricingService.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -48,17 +49,20 @@ public class TariffRateConfiguration : IEntityTypeConfiguration<TariffRate>
         builder.HasIndex(rate => new { rate.Category, rate.Code });
 
         builder.HasData(
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0001-000000000001"), Category = TariffCategory.ShippingType, Code = "Standard", Name = "Обычная", Price = 0m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0001-000000000002"), Category = TariffCategory.ShippingType, Code = "Express", Name = "Экспресс", Price = 500m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0001-000000000001"), Category = TariffCategory.ShippingType, Code = TariffCodes.ShippingStandard, Name = "Обычная", Price = 0m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0001-000000000002"), Category = TariffCategory.ShippingType, Code = TariffCodes.ShippingExpress, Name = "Экспресс", Price = 500m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
 
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000001"), Category = TariffCategory.PackagingType, Code = "Wooden", Name = "Деревянная упаковка", Price = 300m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000002"), Category = TariffCategory.PackagingType, Code = "Pallet", Name = "Паллет", Price = 500m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000003"), Category = TariffCategory.PackagingType, Code = "Special", Name = "Спец. упаковка", Price = 800m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000001"), Category = TariffCategory.PackagingType, Code = TariffCodes.PackagingWooden, Name = "Деревянная упаковка", Price = 300m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000002"), Category = TariffCategory.PackagingType, Code = TariffCodes.PackagingPallet, Name = "Паллет", Price = 500m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0002-000000000003"), Category = TariffCategory.PackagingType, Code = TariffCodes.PackagingSpecial, Name = "Спец. упаковка", Price = 800m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
 
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0003-000000000001"), Category = TariffCategory.PickupDelivery, Code = "Pickup", Name = "Забор", Price = 400m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0003-000000000002"), Category = TariffCategory.PickupDelivery, Code = "Delivery", Name = "Доставка", Price = 400m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0003-000000000001"), Category = TariffCategory.PickupDelivery, Code = TariffCodes.Pickup, Name = "Забор", Price = 400m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0003-000000000002"), Category = TariffCategory.PickupDelivery, Code = TariffCodes.Delivery, Name = "Доставка", Price = 400m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
 
-            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0004-000000000001"), Category = TariffCategory.Insurance, Code = "Percentage", Name = "Страхование груза", Price = 1.0m, PriceType = TariffPriceType.Percentage, ValidFrom = SeedValidFrom }
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0004-000000000001"), Category = TariffCategory.Insurance, Code = TariffCodes.InsurancePercentage, Name = "Страхование груза", Price = 1.0m, PriceType = TariffPriceType.Percentage, ValidFrom = SeedValidFrom },
+
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0005-000000000001"), Category = TariffCategory.BaseRate, Code = TariffCodes.BaseRatePerKg, Name = "Ставка за кг", Price = 50m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom },
+            new TariffRate { Id = Guid.Parse("00000000-0000-0000-0005-000000000002"), Category = TariffCategory.BaseRate, Code = TariffCodes.BaseRatePerKm, Name = "Ставка за км", Price = 15m, PriceType = TariffPriceType.Fixed, ValidFrom = SeedValidFrom }
         );
     }
 }
