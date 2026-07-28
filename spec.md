@@ -220,7 +220,7 @@
 
 ### Фаза 2 — Clients Service (CRM контрагентов)
 - [x] Создать проект (Domain/Application/Persistence/Infrastructure/API).
-- [ ] Сущности `Counterparty`, `ClientAccount`, миграции PostgreSQL.
+- [x] Сущности `Counterparty`, `ClientAccount`, миграции PostgreSQL.
 - [ ] CRUD API + поиск по городу/названию/телефону.
 - [ ] Consumer события `UserRegistered` → авто-создание `ClientAccount`.
 - [ ] Тесты, Dockerfile, docker-compose.
