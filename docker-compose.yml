@@ -119,6 +119,32 @@ services:
       seq:
         condition: service_started
 
+  # Контекст сборки — корень репозитория: ClientsService.Infrastructure ссылается
+  # на shared/CargoService.Contracts (consumer UserRegistered), та же причина,
+  # что у cargoservice выше.
+  clientsservice:
+    build:
+      context: .
+      dockerfile: services/clients-service/Dockerfile
+    container_name: clientsservice-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=clientsservice;Username=clientsservice;Password=clientsservice
+      Keycloak__BaseUrl: http://keycloak:8080
+      RabbitMQ__HostName: rabbitmq
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      seq:
+        condition: service_started
+
   # Остальные сервисы (orders-service, cargo-service, pricing-service, ...) добавляются
   # сюда по мере реализации их Dockerfile-ов (см. spec.md, Фазы 1-12), а также
   # api-gateway — по мере реализации Фазы 12.
