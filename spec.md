@@ -222,7 +222,7 @@
 - [x] Создать проект (Domain/Application/Persistence/Infrastructure/API).
 - [x] Сущности `Counterparty`, `ClientAccount`, миграции PostgreSQL.
 - [x] CRUD API + поиск по городу/названию/телефону.
-- [ ] Consumer события `UserRegistered` → авто-создание `ClientAccount`.
+- [x] Consumer события `UserRegistered` → авто-создание `ClientAccount`.
 - [ ] Тесты, Dockerfile, docker-compose.
 
 ### Фаза 3 — Pricing Service
