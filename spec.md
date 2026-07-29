@@ -230,13 +230,14 @@
 - [x] Сущность `TariffRate`, seed начальных тарифов (обычная/экспресс, деревянная/паллет/спец. упаковка, забор/доставка, страхование).
 - [x] Реализовать `POST /pricing/calculate` с бизнес-логикой расчёта (вес/объём/расстояние/услуги).
 - [x] Admin API для управления тарифами + публикация `TariffChanged`.
-- [ ] Кэширование тарифов (in-memory/Redis) на стороне Orders Service — обновление по событию.
-- [ ] Тесты расчёта (граничные случаи: нулевой вес, комбинации услуг), Dockerfile.
+- [ ] ~~Кэширование тарифов (in-memory/Redis) на стороне Orders Service~~ — перенесено на Фазу 4 (см. её чек-лист): Orders Service ещё не существует на момент Фазы 3, строить кэш и consumer `TariffChanged` негде без самого сервиса.
+- [x] Тесты расчёта (граничные случаи: нулевой вес, комбинации услуг), Dockerfile. Unit-тесты `PricingService.Application.Tests` (11 тестов — расчёт + управление тарифами) прогнаны и зелёные. Интеграционные тесты `PricingService.IntegrationTests` написаны (по образцу clients-service), но не запускались вживую в этой среде — тот же известный Npgsql/Testcontainers-баг окружения, что и у identity-service/clients-service (см. их записи в чек-листе). Сервис проверен вживую иначе: собранный `final`-образ (`docker build --target final`, затем `docker compose up`) поднимается, мигрирует БД (`tariff_rates`, `outbox_messages`) и отвечает на `/openapi/v1.json`.
 
 ### Фаза 4 — Orders Service
 - [ ] Создать проект по Clean Architecture.
 - [ ] Сущность `Order` со всеми полями из ТЗ (см. 2.4), валидация (FluentValidation).
 - [ ] Синхронный вызов `Pricing.calculate` при создании заявки (HttpClient + Polly retry/circuit breaker).
+- [ ] Consumer `TariffChanged` → кэширование тарифов (in-memory/Redis), обновление по событию вместо повторного синхронного вызова `Pricing.calculate` на каждую мелочь (перенесено из Фазы 3).
 - [ ] `POST /orders`, подтверждение/отмена заявки, генерация номера заявки.
 - [ ] Outbox + публикация `OrderCreated`/`OrderConfirmed`/`OrderCancelled`.
 - [ ] Consumer `CargoStatusChanged`, `PaymentCompleted` — обновление статуса заявки в read-модели.

@@ -145,8 +145,34 @@ services:
       seq:
         condition: service_started
 
-  # Остальные сервисы (orders-service, cargo-service, pricing-service, ...) добавляются
-  # сюда по мере реализации их Dockerfile-ов (см. spec.md, Фазы 1-12), а также
+  # Контекст сборки — корень репозитория: PricingService.Application/Infrastructure
+  # ссылаются на shared/CargoService.Contracts (outbox TariffChanged), та же причина,
+  # что у cargoservice/clientsservice выше.
+  pricingservice:
+    build:
+      context: .
+      dockerfile: services/pricing-service/Dockerfile
+    container_name: pricingservice-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=pricingservice;Username=pricingservice;Password=pricingservice
+      Keycloak__BaseUrl: http://keycloak:8080
+      RabbitMQ__HostName: rabbitmq
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      seq:
+        condition: service_started
+
+  # Остальные сервисы (orders-service, cargo-service, ...) добавляются сюда по мере
+  # реализации их Dockerfile-ов (см. spec.md, Фазы 1-12), а также
   # api-gateway — по мере реализации Фазы 12.
 
 volumes:
