@@ -235,7 +235,7 @@
 
 ### Фаза 4 — Orders Service
 - [x] Создать проект по Clean Architecture.
-- [ ] Сущность `Order` со всеми полями из ТЗ (см. 2.4), валидация (FluentValidation).
+- [x] Сущность `Order` со всеми полями из ТЗ (см. 2.4), валидация (FluentValidation). Миграция применена к реальному Postgres и проверена — все owned-типы (`Sender`/`Recipient`/`ServiceOptions`) корректно легли в колонки таблицы `orders`; сервис поднимается и отвечает на `/openapi/v1.json`.
 - [ ] Синхронный вызов `Pricing.calculate` при создании заявки (HttpClient + Polly retry/circuit breaker).
 - [ ] Consumer `TariffChanged` → кэширование тарифов (in-memory/Redis), обновление по событию вместо повторного синхронного вызова `Pricing.calculate` на каждую мелочь (перенесено из Фазы 3).
 - [ ] `POST /orders`, подтверждение/отмена заявки, генерация номера заявки.
