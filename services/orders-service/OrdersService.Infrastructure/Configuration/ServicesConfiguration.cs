@@ -1,4 +1,5 @@
 using OrdersService.Application.Interfaces;
+using OrdersService.Infrastructure.Messaging;
 using OrdersService.Infrastructure.Pricing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,10 +11,9 @@ namespace OrdersService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // The RabbitMQ consumer for TariffChanged and the outbox publisher for
-    // OrderCreated/OrderConfirmed/OrderCancelled (see spec.md Phase 4) are wired up here once
-    // they're built, following IdentityService.Infrastructure's OutboxDispatcher as the reference
-    // for BackgroundService/reconnect-on-failure style.
+    // The outbox publisher for OrderCreated/OrderConfirmed/OrderCancelled (see spec.md Phase 4) is
+    // wired up here once it's built, following IdentityService.Infrastructure's OutboxDispatcher
+    // as the reference for BackgroundService/reconnect-on-failure style.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var pricingSection = configuration.GetSection(PricingClientOptions.SectionName);
@@ -21,6 +21,9 @@ public static class ServicesConfiguration
         {
             BaseUrl = pricingSection["BaseUrl"] ?? throw new InvalidOperationException("PricingService:BaseUrl is not configured."),
         };
+
+        services.AddMemoryCache();
+        services.AddSingleton<ICalculationCache, InMemoryCalculationCache>();
 
         services.AddHttpClient<IPricingClient, PricingClient>(client =>
             {
@@ -35,6 +38,18 @@ public static class ServicesConfiguration
             .AddPolicyHandler(GetRetryPolicy())
             .AddPolicyHandler(GetCircuitBreakerPolicy())
             .AddPolicyHandler(GetTimeoutPolicy());
+
+        var rabbitMqSection = configuration.GetSection(RabbitMqOptions.SectionName);
+        var rabbitMqOptions = new RabbitMqOptions
+        {
+            HostName = rabbitMqSection["HostName"] ?? throw new InvalidOperationException("RabbitMQ:HostName is not configured."),
+            Port = int.Parse(rabbitMqSection["Port"] ?? throw new InvalidOperationException("RabbitMQ:Port is not configured.")),
+            UserName = rabbitMqSection["UserName"] ?? throw new InvalidOperationException("RabbitMQ:UserName is not configured."),
+            Password = rabbitMqSection["Password"] ?? throw new InvalidOperationException("RabbitMQ:Password is not configured."),
+        };
+
+        services.AddSingleton(rabbitMqOptions);
+        services.AddHostedService<TariffChangedConsumer>();
 
         return services;
     }

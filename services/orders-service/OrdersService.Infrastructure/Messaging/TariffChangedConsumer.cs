@@ -1,0 +1,128 @@
+using System.Text.Json;
+using CargoService.Contracts.Events.V1;
+using CargoService.Contracts.Messaging;
+using OrdersService.Application.Interfaces;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+
+namespace OrdersService.Infrastructure.Messaging;
+
+/// <summary>
+/// Consumes TariffChanged events published by pricing-service's outbox and clears the local
+/// calculate() memoization cache (see ICalculationCache) — any previously cached price might now
+/// be wrong, and there's no cheap way to tell which cached entries the change actually affects, so
+/// this just drops the whole cache rather than trying to be surgical about it.
+/// </summary>
+public class TariffChangedConsumer(
+    ICalculationCache calculationCache,
+    RabbitMqOptions options,
+    ILogger<TariffChangedConsumer> logger) : BackgroundService
+{
+    private const string ConsumingService = "orders-service";
+    private const string PublishingService = "pricing-service";
+    private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(10);
+
+    private static readonly string QueueName = RabbitMqConventions.QueueName(ConsumingService, nameof(TariffChanged));
+    private static readonly string DeadLetterQueueName = QueueName + RabbitMqConventions.DeadLetterSuffix;
+    private static readonly string RoutingKey = RabbitMqConventions.RoutingKey(PublishingService, nameof(TariffChanged));
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await RunAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Shutting down.
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "TariffChanged consumer failed, reconnecting in {Delay}", ReconnectDelay);
+                await Task.Delay(ReconnectDelay, stoppingToken);
+            }
+        }
+    }
+
+    private async Task RunAsync(CancellationToken stoppingToken)
+    {
+        var factory = new ConnectionFactory
+        {
+            HostName = options.HostName,
+            Port = options.Port,
+            UserName = options.UserName,
+            Password = options.Password,
+        };
+
+        await using var connection = await factory.CreateConnectionAsync(stoppingToken);
+        await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
+
+        await channel.ExchangeDeclareAsync(
+            RabbitMqConventions.EventsExchange,
+            ExchangeType.Topic,
+            durable: true,
+            cancellationToken: stoppingToken);
+
+        await channel.QueueDeclareAsync(
+            DeadLetterQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            cancellationToken: stoppingToken);
+
+        // Default (nameless) exchange routes by queue name, so routing the dead letter straight
+        // to the DLQ's name is enough — no separate dead-letter exchange to declare/bind.
+        await channel.QueueDeclareAsync(
+            QueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = string.Empty,
+                ["x-dead-letter-routing-key"] = DeadLetterQueueName,
+            },
+            cancellationToken: stoppingToken);
+
+        await channel.QueueBindAsync(QueueName, RabbitMqConventions.EventsExchange, RoutingKey, cancellationToken: stoppingToken);
+        await channel.BasicQosAsync(0, prefetchCount: 10, global: false, cancellationToken: stoppingToken);
+
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += async (_, eventArgs) => await HandleMessageAsync(channel, eventArgs, stoppingToken);
+
+        await channel.BasicConsumeAsync(QueueName, autoAck: false, consumer, stoppingToken);
+
+        // BasicConsumeAsync only registers the consumer — keep the connection/channel alive for
+        // the rest of the app's lifetime (or until an exception from the callback bubbles up and
+        // ExecuteAsync's catch-all reconnects).
+        await Task.Delay(Timeout.Infinite, stoppingToken);
+    }
+
+    private async Task HandleMessageAsync(IChannel channel, BasicDeliverEventArgs eventArgs, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var tariffChanged = JsonSerializer.Deserialize<TariffChanged>(eventArgs.Body.Span)
+                ?? throw new InvalidOperationException("TariffChanged payload deserialized to null.");
+
+            calculationCache.Clear();
+            logger.LogInformation(
+                "Cleared calculation cache after TariffChanged ({Category}/{Code} -> {Price})",
+                tariffChanged.Category, tariffChanged.Code, tariffChanged.Price);
+
+            await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to process TariffChanged message {MessageId}, sending to dead-letter queue",
+                eventArgs.BasicProperties.MessageId);
+            await channel.BasicNackAsync(eventArgs.DeliveryTag, multiple: false, requeue: false, stoppingToken);
+        }
+    }
+}
