@@ -1,4 +1,5 @@
 using PricingService.Application.Interfaces;
+using PricingService.Persistence.Outbox;
 using PricingService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public static class PersistenceConfiguration
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<ITariffRatesRepository, TariffRatesRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }

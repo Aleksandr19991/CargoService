@@ -1,3 +1,5 @@
+using PricingService.Infrastructure.Messaging;
+using PricingService.Infrastructure.Outbox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -5,11 +7,20 @@ namespace PricingService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // No Infrastructure services yet — publishing TariffChanged over RabbitMQ (see spec.md
-    // Phase 3) is wired up here once it's built, following IdentityService.Infrastructure's
-    // OutboxDispatcher as the reference for BackgroundService/reconnect-on-failure style.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var rabbitMqSection = configuration.GetSection(RabbitMqOptions.SectionName);
+        var rabbitMqOptions = new RabbitMqOptions
+        {
+            HostName = rabbitMqSection["HostName"] ?? throw new InvalidOperationException("RabbitMQ:HostName is not configured."),
+            Port = int.Parse(rabbitMqSection["Port"] ?? throw new InvalidOperationException("RabbitMQ:Port is not configured.")),
+            UserName = rabbitMqSection["UserName"] ?? throw new InvalidOperationException("RabbitMQ:UserName is not configured."),
+            Password = rabbitMqSection["Password"] ?? throw new InvalidOperationException("RabbitMQ:Password is not configured."),
+        };
+
+        services.AddSingleton(rabbitMqOptions);
+        services.AddHostedService<OutboxDispatcher>();
+
         return services;
     }
 }

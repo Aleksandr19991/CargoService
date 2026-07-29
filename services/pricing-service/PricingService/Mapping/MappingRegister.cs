@@ -2,6 +2,7 @@ using Mapster;
 using PricingService.API.Models.Requests;
 using PricingService.API.Models.Responses;
 using PricingService.Application.Models;
+using PricingService.Domain.Entities;
 
 namespace PricingService.API.Mapping;
 
@@ -20,5 +21,7 @@ public class MappingRegister : IRegister
 
         config.NewConfig<PriceBreakdownLine, PriceBreakdownItemResponse>();
         config.NewConfig<PriceCalculationResult, PriceCalculationResponse>();
+
+        config.NewConfig<TariffRate, TariffRateResponse>();
     }
 }

@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddPersistence(connectionString);
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddKeycloakAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
@@ -25,6 +26,8 @@ app.MapDevelopmentEndpoints();
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
