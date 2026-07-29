@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Mapster.DependencyInjection" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Seq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OrdersService.Application\OrdersService.Application.csproj" />
+    <ProjectReference Include="..\OrdersService.Infrastructure\OrdersService.Infrastructure.csproj" />
+    <ProjectReference Include="..\OrdersService.Persistence\OrdersService.Persistence.csproj" />
+  </ItemGroup>
+
+</Project>

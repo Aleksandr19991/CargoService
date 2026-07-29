@@ -13,3 +13,7 @@ GRANT ALL PRIVILEGES ON DATABASE clientsservice TO clientsservice;
 CREATE USER pricingservice WITH PASSWORD 'pricingservice';
 CREATE DATABASE pricingservice OWNER pricingservice;
 GRANT ALL PRIVILEGES ON DATABASE pricingservice TO pricingservice;
+
+CREATE USER ordersservice WITH PASSWORD 'ordersservice';
+CREATE DATABASE ordersservice OWNER ordersservice;
+GRANT ALL PRIVILEGES ON DATABASE ordersservice TO ordersservice;

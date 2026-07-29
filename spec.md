@@ -234,7 +234,7 @@
 - [x] Тесты расчёта (граничные случаи: нулевой вес, комбинации услуг), Dockerfile. Unit-тесты `PricingService.Application.Tests` (11 тестов — расчёт + управление тарифами) прогнаны и зелёные. Интеграционные тесты `PricingService.IntegrationTests` написаны (по образцу clients-service), но не запускались вживую в этой среде — тот же известный Npgsql/Testcontainers-баг окружения, что и у identity-service/clients-service (см. их записи в чек-листе). Сервис проверен вживую иначе: собранный `final`-образ (`docker build --target final`, затем `docker compose up`) поднимается, мигрирует БД (`tariff_rates`, `outbox_messages`) и отвечает на `/openapi/v1.json`.
 
 ### Фаза 4 — Orders Service
-- [ ] Создать проект по Clean Architecture.
+- [x] Создать проект по Clean Architecture.
 - [ ] Сущность `Order` со всеми полями из ТЗ (см. 2.4), валидация (FluentValidation).
 - [ ] Синхронный вызов `Pricing.calculate` при создании заявки (HttpClient + Polly retry/circuit breaker).
 - [ ] Consumer `TariffChanged` → кэширование тарифов (in-memory/Redis), обновление по событию вместо повторного синхронного вызова `Pricing.calculate` на каждую мелочь (перенесено из Фазы 3).
