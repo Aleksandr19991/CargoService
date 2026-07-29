@@ -12,9 +12,11 @@ public class CreateOrderRequestValidator : AbstractValidator<CreateOrderRequest>
 
         RuleFor(x => x.OriginCity).NotEmpty().MaximumLength(100);
         RuleFor(x => x.DestinationCity).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.DistanceKm).GreaterThanOrEqualTo(0);
 
         RuleFor(x => x.CargoName).NotEmpty().MaximumLength(200);
         RuleFor(x => x.CargoWeight).GreaterThan(0);
+        RuleFor(x => x.CargoVolumeM3).GreaterThanOrEqualTo(0);
         RuleFor(x => x.CargoQuantity).GreaterThan(0);
 
         RuleFor(x => x.DeclaredValue).GreaterThanOrEqualTo(0);

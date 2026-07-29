@@ -1,3 +1,5 @@
+using OrdersService.Application.Interfaces;
+using OrdersService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +11,8 @@ public static class PersistenceConfiguration
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
+
+        services.AddScoped<IOrdersRepository, OrdersRepository>();
 
         return services;
     }

@@ -16,6 +16,11 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.Number)
             .HasMaxLength(50);
 
+        // Number is always assigned at creation (see Order.Number) — unique so a generation
+        // collision surfaces as a clear DbUpdateException rather than silent ambiguity.
+        builder.HasIndex(order => order.Number)
+            .IsUnique();
+
         builder.Property(order => order.Status)
             .HasConversion<string>()
             .HasMaxLength(20)
@@ -33,12 +38,18 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Property(order => order.DistanceKm)
+            .HasPrecision(10, 2);
+
         builder.Property(order => order.CargoName)
             .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(order => order.CargoWeight)
             .HasPrecision(10, 2);
+
+        builder.Property(order => order.CargoVolumeM3)
+            .HasPrecision(10, 3);
 
         builder.Property(order => order.DeclaredValue)
             .HasPrecision(12, 2);
