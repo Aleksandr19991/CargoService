@@ -79,6 +79,30 @@ public class OrdersService(
         return OrderTransitionResult.Success;
     }
 
+    public async Task<bool> UpdateCargoStatusAsync(Guid orderId, string trackingNumber, string status, CancellationToken cancellationToken = default)
+    {
+        var order = await ordersRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order is null)
+            return false;
+
+        order.TrackingNumber = trackingNumber;
+        order.CargoStatus = status;
+        await ordersRepository.UpdateAsync(order, cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> MarkPaidAsync(Guid orderId, Guid paymentId, CancellationToken cancellationToken = default)
+    {
+        var order = await ordersRepository.GetByIdAsync(orderId, cancellationToken);
+        if (order is null)
+            return false;
+
+        order.IsPaid = true;
+        order.PaymentId = paymentId;
+        await ordersRepository.UpdateAsync(order, cancellationToken);
+        return true;
+    }
+
     private async Task<OrderTransitionResult> TransitionAsync(
         Guid userId,
         Guid id,

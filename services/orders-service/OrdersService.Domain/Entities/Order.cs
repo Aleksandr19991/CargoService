@@ -55,4 +55,15 @@ public class Order
     // cross-service joins.
     public Guid? SenderCounterpartyId { get; set; }
     public Guid? RecipientCounterpartyId { get; set; }
+
+    // Not in spec.md's original field list — a read-model projection of cargo-service's Shipment,
+    // kept in sync by CargoStatusChangedConsumer (see spec.md Phase 4). Null until the order's
+    // shipment is created and the first status event arrives.
+    public string? TrackingNumber { get; set; }
+    public string? CargoStatus { get; set; }
+
+    // Not in spec.md's original field list — a read-model projection of payment-service's payment
+    // record, kept in sync by PaymentCompletedConsumer (see spec.md Phase 4).
+    public bool IsPaid { get; set; }
+    public Guid? PaymentId { get; set; }
 }

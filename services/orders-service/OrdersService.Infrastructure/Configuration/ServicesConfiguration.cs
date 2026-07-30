@@ -48,6 +48,8 @@ public static class ServicesConfiguration
 
         services.AddSingleton(rabbitMqOptions);
         services.AddHostedService<TariffChangedConsumer>();
+        services.AddHostedService<CargoStatusChangedConsumer>();
+        services.AddHostedService<PaymentCompletedConsumer>();
         services.AddHostedService<OutboxDispatcher>();
 
         return services;

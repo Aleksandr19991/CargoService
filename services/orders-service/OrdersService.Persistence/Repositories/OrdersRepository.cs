@@ -19,6 +19,11 @@ public class OrdersRepository(AppDbContext context) : IOrdersRepository
             .FirstOrDefaultAsync(order => order.Id == id && order.ClientAccountId == clientAccountId, cancellationToken);
     }
 
+    public async Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await context.Orders.FirstOrDefaultAsync(order => order.Id == id, cancellationToken);
+    }
+
     public async Task UpdateAsync(Order order, CancellationToken cancellationToken = default)
     {
         await context.SaveChangesAsync(cancellationToken);

@@ -86,5 +86,15 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsRequired();
 
         builder.HasIndex(order => order.ClientAccountId);
+
+        builder.Property(order => order.TrackingNumber)
+            .HasMaxLength(50);
+
+        builder.Property(order => order.CargoStatus)
+            .HasMaxLength(50);
+
+        builder.Property(order => order.IsPaid)
+            .HasDefaultValue(false)
+            .IsRequired();
     }
 }

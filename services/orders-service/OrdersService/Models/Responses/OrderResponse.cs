@@ -32,4 +32,8 @@ public sealed record OrderResponse
 
     public Guid? SenderCounterpartyId { get; init; }
     public Guid? RecipientCounterpartyId { get; init; }
+
+    public string? TrackingNumber { get; init; }
+    public string? CargoStatus { get; init; }
+    public bool IsPaid { get; init; }
 }
