@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# IDE-генерируемые профили запуска: Rider/VS пересоздают Properties/launchSettings.json
+# со случайными портами при открытии проекта, из-за чего папка постоянно всплывает в
+# git status. Уже отслеживаемый файл identity-service это правило не затрагивает
+# (.gitignore действует только на неотслеживаемые файлы) — он остаётся в репозитории.
+Properties/
