@@ -16,6 +16,7 @@ public class ClientAccountsRepository(AppDbContext context) : IClientAccountsRep
     public async Task<ClientAccount> GetOrCreateByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var existing = await context.ClientAccounts
+            .AsNoTracking()
             .FirstOrDefaultAsync(account => account.UserId == userId, cancellationToken);
         if (existing is not null)
             return existing;
