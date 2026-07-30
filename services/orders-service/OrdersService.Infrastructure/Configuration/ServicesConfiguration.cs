@@ -1,5 +1,6 @@
 using OrdersService.Application.Interfaces;
 using OrdersService.Infrastructure.Messaging;
+using OrdersService.Infrastructure.Outbox;
 using OrdersService.Infrastructure.Pricing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,9 +12,6 @@ namespace OrdersService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // The outbox publisher for OrderCreated/OrderConfirmed/OrderCancelled (see spec.md Phase 4) is
-    // wired up here once it's built, following IdentityService.Infrastructure's OutboxDispatcher
-    // as the reference for BackgroundService/reconnect-on-failure style.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var pricingSection = configuration.GetSection(PricingClientOptions.SectionName);
@@ -50,6 +48,7 @@ public static class ServicesConfiguration
 
         services.AddSingleton(rabbitMqOptions);
         services.AddHostedService<TariffChangedConsumer>();
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }

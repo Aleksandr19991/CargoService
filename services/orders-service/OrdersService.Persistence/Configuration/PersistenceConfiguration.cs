@@ -1,4 +1,5 @@
 using OrdersService.Application.Interfaces;
+using OrdersService.Persistence.Outbox;
 using OrdersService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public static class PersistenceConfiguration
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<IOrdersRepository, OrdersRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }

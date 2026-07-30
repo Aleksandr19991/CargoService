@@ -1,4 +1,7 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using CargoService.Contracts.Events.V1;
+using CargoService.Contracts.Messaging;
 using OrdersService.Application.Interfaces;
 using OrdersService.Application.Models;
 using OrdersService.Domain.Entities;
@@ -8,12 +11,19 @@ namespace OrdersService.Application;
 
 public class OrdersService(
     IOrdersRepository ordersRepository,
-    IPricingClient pricingClient) : IOrdersService
+    IPricingClient pricingClient,
+    IOutboxWriter outboxWriter) : IOrdersService
 {
+    private const string ServiceName = "orders-service";
     private const string NumberAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I — avoids visual ambiguity
 
     public async Task<Order> CreateAsync(Guid userId, Order order, CancellationToken cancellationToken = default)
     {
+        // Assigned client-side (rather than left to EF's default Guid generator) because the
+        // OrderCreated event below is built and serialized before SaveChangesAsync runs — EF only
+        // populates a generator-assigned Id during SaveChanges, which would otherwise leave the
+        // event's OrderId as all-zeros.
+        order.Id = Guid.NewGuid();
         order.ClientAccountId = userId;
         order.Number = GenerateNumber();
         order.Status = OrderStatus.Created;
@@ -34,6 +44,11 @@ public class OrdersService(
         var priceResult = await pricingClient.CalculateAsync(priceRequest, cancellationToken);
         order.CalculatedPrice = priceResult.TotalPrice;
 
+        EnqueueOrderCreatedEvent(order);
+
+        // Enqueue() above only stages the outbox row on the same (scoped) DbContext that
+        // CreateAsync below commits via SaveChangesAsync — this is what makes the new order row
+        // and the outbox row land in the same database transaction.
         return await ordersRepository.CreateAsync(order, cancellationToken);
     }
 
@@ -44,7 +59,7 @@ public class OrdersService(
 
     public Task<OrderTransitionResult> ConfirmAsync(Guid userId, Guid id, CancellationToken cancellationToken = default)
     {
-        return TransitionAsync(userId, id, OrderStatus.Created, OrderStatus.Confirmed, cancellationToken);
+        return TransitionAsync(userId, id, OrderStatus.Created, OrderStatus.Confirmed, EnqueueOrderConfirmedEvent, cancellationToken);
     }
 
     public async Task<OrderTransitionResult> CancelAsync(Guid userId, Guid id, CancellationToken cancellationToken = default)
@@ -59,6 +74,7 @@ public class OrdersService(
         // Both Created and Confirmed orders can still be cancelled — only an already-cancelled
         // order rejects the transition (handled above).
         order.Status = OrderStatus.Cancelled;
+        EnqueueOrderCancelledEvent(order);
         await ordersRepository.UpdateAsync(order, cancellationToken);
         return OrderTransitionResult.Success;
     }
@@ -68,6 +84,7 @@ public class OrdersService(
         Guid id,
         OrderStatus from,
         OrderStatus to,
+        Action<Order> onSuccess,
         CancellationToken cancellationToken)
     {
         var order = await ordersRepository.GetByIdAsync(id, userId, cancellationToken);
@@ -81,8 +98,47 @@ public class OrdersService(
             return OrderTransitionResult.Conflict;
 
         order.Status = to;
+        onSuccess(order);
         await ordersRepository.UpdateAsync(order, cancellationToken);
         return OrderTransitionResult.Success;
+    }
+
+    private void EnqueueOrderCreatedEvent(Order order)
+    {
+        EnqueueEvent(new OrderCreated
+        {
+            OrderId = order.Id,
+            OrderNumber = order.Number!,
+            ClientAccountId = order.ClientAccountId,
+            OriginCity = order.OriginCity,
+            DestinationCity = order.DestinationCity,
+        }, nameof(OrderCreated));
+    }
+
+    private void EnqueueOrderConfirmedEvent(Order order)
+    {
+        EnqueueEvent(new OrderConfirmed
+        {
+            OrderId = order.Id,
+            OrderNumber = order.Number!,
+            CalculatedPrice = order.CalculatedPrice.GetValueOrDefault(),
+        }, nameof(OrderConfirmed));
+    }
+
+    private void EnqueueOrderCancelledEvent(Order order)
+    {
+        EnqueueEvent(new OrderCancelled
+        {
+            OrderId = order.Id,
+            OrderNumber = order.Number!,
+        }, nameof(OrderCancelled));
+    }
+
+    private void EnqueueEvent<TEvent>(TEvent integrationEvent, string eventName) where TEvent : IntegrationEvent
+    {
+        var routingKey = RabbitMqConventions.RoutingKey(ServiceName, eventName);
+        var payloadJson = JsonSerializer.Serialize(integrationEvent);
+        outboxWriter.Enqueue(integrationEvent.EventId, routingKey, payloadJson, integrationEvent.OccurredAtUtc);
     }
 
     private static string GenerateNumber()

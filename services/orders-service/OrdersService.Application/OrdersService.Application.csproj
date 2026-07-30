@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\CargoService.Contracts\CargoService.Contracts.csproj" />
     <ProjectReference Include="..\OrdersService.Domain\OrdersService.Domain.csproj" />
   </ItemGroup>
 
