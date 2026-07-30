@@ -35,6 +35,23 @@ public class OrdersController(IOrdersService ordersService, IMapper mapper) : Co
         return Ok(mapper.Map<OrderResponse>(order));
     }
 
+    [HttpGet]
+    public async Task<ActionResult<OrderListResponse>> GetOrders(
+        [FromQuery] GetOrdersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var (items, totalCount) = await ordersService.GetByClientAsync(
+            GetUserId(), request.Status, request.Page, request.PageSize, cancellationToken);
+
+        return Ok(new OrderListResponse
+        {
+            Items = mapper.Map<List<OrderResponse>>(items),
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize,
+        });
+    }
+
     [HttpPost("{id}/confirm")]
     public async Task<ActionResult<OrderResponse>> ConfirmOrder(Guid id, CancellationToken cancellationToken)
     {

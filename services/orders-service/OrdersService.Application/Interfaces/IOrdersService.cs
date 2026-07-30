@@ -1,5 +1,6 @@
 using OrdersService.Application.Models;
 using OrdersService.Domain.Entities;
+using OrdersService.Domain.Enums;
 
 namespace OrdersService.Application.Interfaces;
 
@@ -13,6 +14,13 @@ public interface IOrdersService
     Task<Order> CreateAsync(Guid userId, Order order, CancellationToken cancellationToken = default);
 
     Task<Order?> GetByIdAsync(Guid userId, Guid id, CancellationToken cancellationToken = default);
+
+    Task<(List<Order> Items, int TotalCount)> GetByClientAsync(
+        Guid userId,
+        OrderStatus? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 
     Task<OrderTransitionResult> ConfirmAsync(Guid userId, Guid id, CancellationToken cancellationToken = default);
 

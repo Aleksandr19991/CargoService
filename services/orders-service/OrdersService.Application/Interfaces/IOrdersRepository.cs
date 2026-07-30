@@ -1,4 +1,5 @@
 using OrdersService.Domain.Entities;
+using OrdersService.Domain.Enums;
 
 namespace OrdersService.Application.Interfaces;
 
@@ -16,4 +17,13 @@ public interface IOrdersRepository
     Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(Order order, CancellationToken cancellationToken = default);
+
+    // clientAccountId scopes the query to the caller's own orders, same ownership rule as the
+    // other client-facing lookups above.
+    Task<(List<Order> Items, int TotalCount)> GetByClientAsync(
+        Guid clientAccountId,
+        OrderStatus? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }

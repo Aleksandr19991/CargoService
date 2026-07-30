@@ -57,6 +57,16 @@ public class OrdersService(
         return ordersRepository.GetByIdAsync(id, userId, cancellationToken);
     }
 
+    public Task<(List<Order> Items, int TotalCount)> GetByClientAsync(
+        Guid userId,
+        OrderStatus? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        return ordersRepository.GetByClientAsync(userId, status, page, pageSize, cancellationToken);
+    }
+
     public Task<OrderTransitionResult> ConfirmAsync(Guid userId, Guid id, CancellationToken cancellationToken = default)
     {
         return TransitionAsync(userId, id, OrderStatus.Created, OrderStatus.Confirmed, EnqueueOrderConfirmedEvent, cancellationToken);
