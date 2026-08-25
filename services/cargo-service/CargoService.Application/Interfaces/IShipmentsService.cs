@@ -27,4 +27,13 @@ public interface IShipmentsService
     /// прикладывать фото некуда, поэтому у непринятого груза возвращает <c>Conflict</c>.
     /// </summary>
     Task<ShipmentOperationResult> AddPhotosAsync(Guid id, IReadOnlyCollection<Guid> photoFileIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Переводит груз в новый статус и дописывает запись в историю. Повтор того же статуса —
+    /// не ошибка: несколько отметок «ВПути» с разными локациями это и есть трекинг. Из
+    /// <c>Delivered</c> переходов нет (терминальный статус) — там <c>Conflict</c>. Запрет на
+    /// ручную установку <c>Created</c>/<c>Accepted</c> живёт в валидаторе запроса: это
+    /// недопустимые значения сами по себе, а не следствие текущего состояния.
+    /// </summary>
+    Task<ShipmentOperationResult> ChangeStatusAsync(Guid id, ShipmentStatusChange change, CancellationToken cancellationToken = default);
 }

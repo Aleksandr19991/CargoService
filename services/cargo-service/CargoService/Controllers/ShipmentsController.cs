@@ -15,13 +15,20 @@ namespace CargoService.API.Controllers;
 /// </summary>
 [Route("api/shipments")]
 [ApiController]
-[Authorize(Roles = StaffRoles)]
+[Authorize]
 public class ShipmentsController(IShipmentsService shipmentsService, IMapper mapper) : ControllerBase
 {
     // Приёмка и обработка груза — работа склада; Manager/Admin допущены как надзорные роли.
     private const string StaffRoles = "WarehouseOperator,Manager,Admin";
 
+    // Отметки статуса ставит ещё и курьер: забор и доставка — его часть маршрута. К приёмке с
+    // составлением акта он при этом не допущен, поэтому роли перечислены по действиям, а не на
+    // уровне класса (атрибуты класса и метода складываются через И — расширить набор на одном
+    // действии иначе не получится).
+    private const string StatusChangeRoles = StaffRoles + ",Courier";
+
     [HttpGet("{id}")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<ShipmentResponse>> GetShipmentById(Guid id, CancellationToken cancellationToken)
     {
         var shipment = await shipmentsService.GetByIdAsync(id, cancellationToken);
@@ -32,6 +39,7 @@ public class ShipmentsController(IShipmentsService shipmentsService, IMapper map
     }
 
     [HttpPost("{id}/accept")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<ShipmentResponse>> AcceptShipment(
         Guid id,
         [FromBody] AcceptShipmentRequest request,
@@ -55,12 +63,31 @@ public class ShipmentsController(IShipmentsService shipmentsService, IMapper map
     }
 
     [HttpPost("{id}/photos")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<ShipmentResponse>> AddShipmentPhotos(
         Guid id,
         [FromBody] AddShipmentPhotosRequest request,
         CancellationToken cancellationToken)
     {
         var result = await shipmentsService.AddPhotosAsync(id, request.PhotoFileIds, cancellationToken);
+        return await RespondWithShipmentAsync(result, id, cancellationToken);
+    }
+
+    [HttpPost("{id}/status")]
+    [Authorize(Roles = StatusChangeRoles)]
+    public async Task<ActionResult<ShipmentResponse>> ChangeShipmentStatus(
+        Guid id,
+        [FromBody] ChangeShipmentStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        var change = new ShipmentStatusChange
+        {
+            Status = request.Status,
+            Location = request.Location,
+            Comment = request.Comment,
+        };
+
+        var result = await shipmentsService.ChangeStatusAsync(id, change, cancellationToken);
         return await RespondWithShipmentAsync(result, id, cancellationToken);
     }
 

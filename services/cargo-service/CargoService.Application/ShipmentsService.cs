@@ -132,6 +132,38 @@ public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipm
         return ShipmentOperationResult.Success;
     }
 
+    public async Task<ShipmentOperationResult> ChangeStatusAsync(
+        Guid id,
+        ShipmentStatusChange change,
+        CancellationToken cancellationToken = default)
+    {
+        var shipment = await shipmentsRepository.GetByIdWithDetailsAsync(id, cancellationToken);
+        if (shipment is null)
+            return ShipmentOperationResult.NotFound;
+
+        // Единственное ограничение по состоянию: выданный груз дальше не живёт. Остальные
+        // переходы намеренно свободны — реальная логистика не линейна (груз возвращается на
+        // склад, задерживается, снова уезжает), и жёсткий граф переходов только мешал бы
+        // складу отражать факты. Недопустимые сами по себе значения (Created/Accepted) режет
+        // валидатор запроса.
+        if (shipment.CurrentStatus == ShipmentStatus.Delivered)
+            return ShipmentOperationResult.Conflict;
+
+        // Повтор того же статуса не отсекаем: «ВПути / Москва», затем «ВПути / Казань» — это
+        // две законные отметки трекинга, а не дубликат.
+        shipment.CurrentStatus = change.Status;
+        shipment.StatusHistory.Add(new ShipmentStatusHistory
+        {
+            Status = change.Status,
+            ChangedAt = DateTimeOffset.UtcNow,
+            Location = change.Location,
+            Comment = change.Comment,
+        });
+
+        await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
+        return ShipmentOperationResult.Success;
+    }
+
     /// <summary>
     /// Формат <c>CS-XXXXXXXXXX</c>. Намеренно отличается от номера заявки
     /// (<c>{yyyyMMdd}-{6 символов}</c> в orders-service): трек-номер живёт на публичном
