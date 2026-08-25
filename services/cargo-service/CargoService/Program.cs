@@ -31,3 +31,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Makes the top-level-statement-generated Program class visible to
+// WebApplicationFactory<Program> in CargoService.IntegrationTests.
+public partial class Program;

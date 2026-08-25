@@ -44,5 +44,13 @@ services:
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
 
+  cargoshipments:
+    build:
+      target: dev
+    volumes:
+      - .:/src
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+
   # Остальные сервисы получают аналогичный override (build.target: dev, volume
   # на весь репозиторий) по мере появления их Dockerfile-ов.

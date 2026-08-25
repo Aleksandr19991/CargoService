@@ -1,7 +1,9 @@
 <Solution>
   <Project Path="CargoService.Application/CargoService.Application.csproj" />
+  <Project Path="CargoService.Application.Tests/CargoService.Application.Tests.csproj" />
   <Project Path="CargoService.Domain/CargoService.Domain.csproj" />
   <Project Path="CargoService.Infrastructure/CargoService.Infrastructure.csproj" />
+  <Project Path="CargoService.IntegrationTests/CargoService.IntegrationTests.csproj" />
   <Project Path="CargoService.Persistence/CargoService.Persistence.csproj" />
   <Project Path="CargoService/CargoService.API.csproj" />
 </Solution>
