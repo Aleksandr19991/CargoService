@@ -1,4 +1,5 @@
 using CargoService.Infrastructure.Messaging;
+using CargoService.Infrastructure.Outbox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -6,8 +7,7 @@ namespace CargoService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Consumer PackageIntegrityAssessed и outbox-публикация CargoAccepted/CargoStatusChanged/
-    // CargoPhotoUploaded/CargoDelivered (spec.md Фаза 5) регистрируются здесь по мере реализации.
+    // Consumer PackageIntegrityAssessed (spec.md Фаза 5) регистрируется здесь по мере реализации.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var rabbitMqSection = configuration.GetSection(RabbitMqOptions.SectionName);
@@ -21,6 +21,7 @@ public static class ServicesConfiguration
 
         services.AddSingleton(rabbitMqOptions);
         services.AddHostedService<OrderConfirmedConsumer>();
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }

@@ -1,4 +1,5 @@
 using CargoService.Application.Interfaces;
+using CargoService.Persistence.Outbox;
 using CargoService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public static class PersistenceConfiguration
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
 
         services.AddScoped<IShipmentsRepository, ShipmentsRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }

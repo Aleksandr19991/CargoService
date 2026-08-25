@@ -1,13 +1,20 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using CargoService.Application.Interfaces;
 using CargoService.Application.Models;
+using CargoService.Contracts.Events.V1;
+using CargoService.Contracts.Messaging;
 using CargoService.Domain.Entities;
 using CargoService.Domain.Enums;
 
 namespace CargoService.Application;
 
-public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipmentsService
+public class ShipmentsService(
+    IShipmentsRepository shipmentsRepository,
+    IOutboxWriter outboxWriter) : IShipmentsService
 {
+    private const string ServiceName = "cargo-service";
+
     // Тот же алфавит без 0/O/1/I, что у номера заявки в orders-service: трек-номер клиенты
     // диктуют по телефону и вбивают руками, визуально неоднозначные символы здесь дороже всего.
     private const string TrackingAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -99,8 +106,20 @@ public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipm
             Comment = acceptance.Comment,
         });
 
-        // Акт, услуги упаковки, новый статус и запись истории уходят одним SaveChanges —
-        // частично принятого груза в БД не бывает.
+        EnqueueCargoAccepted(shipment, acceptance);
+
+        // Приёмка публикует и CargoStatusChanged: подписчики у событий разные (CargoAccepted —
+        // notification/document/logistics, CargoStatusChanged — orders-service/notification/
+        // reporting), и без второго события orders-service никогда не увидел бы переход в
+        // Accepted в read-модели заявки.
+        EnqueueCargoStatusChanged(shipment, ShipmentStatus.Accepted, acceptance.Location);
+
+        // Фото, приложенные прямо к приёмке, тоже уходят на анализ в ai-inspection-service.
+        if (acceptance.PhotoFileIds.Count > 0)
+            EnqueueCargoPhotoUploaded(shipment, acceptance.PhotoFileIds);
+
+        // Акт, услуги упаковки, новый статус, запись истории и строки outbox уходят одним
+        // SaveChanges — ни частично принятого груза, ни события без приёмки в БД не бывает.
         await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
         return ShipmentOperationResult.Success;
     }
@@ -122,11 +141,19 @@ public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipm
         if (inspection is null)
             return ShipmentOperationResult.Conflict;
 
+        // Отсекаем повторно присланные файлы (ретрай клиента): они уже в акте, и повторный
+        // CargoPhotoUploaded заставил бы ai-inspection-service анализировать их заново.
+        var addedPhotoFileIds = photoFileIds.Except(inspection.PhotoFileIds).ToList();
+        if (addedPhotoFileIds.Count == 0)
+            return ShipmentOperationResult.Success;
+
         // Присваиваем новый список, а не мутируем существующий: свойство ложится в колонку uuid[],
         // и увидит ли EF правку «на месте», зависит от value comparer'а провайдера — на эту
-        // деталь лучше не опираться. Заодно отсекаем повторно присланные файлы (ретрай клиента):
-        // дубликаты в списке дадут только лишние CargoPhotoUploaded в будущем.
-        inspection.PhotoFileIds = [.. inspection.PhotoFileIds.Union(photoFileIds)];
+        // деталь лучше не опираться.
+        inspection.PhotoFileIds = [.. inspection.PhotoFileIds, .. addedPhotoFileIds];
+
+        // В событие уходят только новые файлы — анализировать уже разобранные ни к чему.
+        EnqueueCargoPhotoUploaded(shipment, addedPhotoFileIds);
 
         await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
         return ShipmentOperationResult.Success;
@@ -170,8 +197,75 @@ public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipm
             Comment = change.Comment,
         });
 
+        EnqueueCargoStatusChanged(shipment, change.Status, change.Location);
+
+        // Выдача — отдельное событие поверх смены статуса: у него свой круг подписчиков
+        // (document-service выпускает закрывающие документы, reporting считает завершённые
+        // доставки) и им не нужно разбирать строковый статус из CargoStatusChanged.
+        if (change.Status == ShipmentStatus.Delivered)
+            EnqueueCargoDelivered(shipment);
+
         await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
         return ShipmentOperationResult.Success;
+    }
+
+    private void EnqueueCargoAccepted(Shipment shipment, ShipmentAcceptance acceptance)
+    {
+        EnqueueEvent(new CargoAccepted
+        {
+            ShipmentId = shipment.Id,
+            OrderId = shipment.OrderId,
+            TrackingNumber = shipment.TrackingNumber,
+            // Контракт возит состояния строками: подписчики (в т.ч. будущий ai-inspection-service)
+            // живут в других сервисах и наших enum'ов не знают.
+            PackagingCondition = acceptance.PackagingCondition.ToString(),
+            CargoCondition = acceptance.CargoCondition.ToString(),
+            InspectedByUserId = acceptance.InspectedByUserId,
+        }, nameof(CargoAccepted));
+    }
+
+    private void EnqueueCargoStatusChanged(Shipment shipment, ShipmentStatus status, string? location)
+    {
+        EnqueueEvent(new CargoStatusChanged
+        {
+            ShipmentId = shipment.Id,
+            // Поле добавлено в контракт в Фазе 4 именно ради этого: без OrderId orders-service
+            // не смог бы сопоставить событие со своей заявкой.
+            OrderId = shipment.OrderId,
+            TrackingNumber = shipment.TrackingNumber,
+            Status = status.ToString(),
+            Location = location,
+        }, nameof(CargoStatusChanged));
+    }
+
+    private void EnqueueCargoPhotoUploaded(Shipment shipment, IReadOnlyCollection<Guid> photoFileIds)
+    {
+        EnqueueEvent(new CargoPhotoUploaded
+        {
+            ShipmentId = shipment.Id,
+            TrackingNumber = shipment.TrackingNumber,
+            PhotoFileIds = [.. photoFileIds],
+        }, nameof(CargoPhotoUploaded));
+    }
+
+    private void EnqueueCargoDelivered(Shipment shipment)
+    {
+        EnqueueEvent(new CargoDelivered
+        {
+            ShipmentId = shipment.Id,
+            OrderId = shipment.OrderId,
+            TrackingNumber = shipment.TrackingNumber,
+            // ReceivedByName не заполняем: API выдачи не собирает имя получателя (отдельного
+            // эндпоинта выдачи нет, статус ставится обычным POST /status). Тот же компромисс,
+            // что с OrderCancelled.Reason в orders-service.
+        }, nameof(CargoDelivered));
+    }
+
+    private void EnqueueEvent<TEvent>(TEvent integrationEvent, string eventName) where TEvent : IntegrationEvent
+    {
+        var routingKey = RabbitMqConventions.RoutingKey(ServiceName, eventName);
+        var payloadJson = JsonSerializer.Serialize(integrationEvent);
+        outboxWriter.Enqueue(integrationEvent.EventId, routingKey, payloadJson, integrationEvent.OccurredAtUtc);
     }
 
     /// <summary>
