@@ -17,3 +17,9 @@ GRANT ALL PRIVILEGES ON DATABASE pricingservice TO pricingservice;
 CREATE USER ordersservice WITH PASSWORD 'ordersservice';
 CREATE DATABASE ordersservice OWNER ordersservice;
 GRANT ALL PRIVILEGES ON DATABASE ordersservice TO ordersservice;
+
+-- cargo-service. Имя cargoshipments, а не cargoservice: последнее занято identity-service
+-- (наследие общего названия платформы, появившегося до этого сервиса).
+CREATE USER cargoshipments WITH PASSWORD 'cargoshipments';
+CREATE DATABASE cargoshipments OWNER cargoshipments;
+GRANT ALL PRIVILEGES ON DATABASE cargoshipments TO cargoshipments;
