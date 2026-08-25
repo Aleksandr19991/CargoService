@@ -42,4 +42,12 @@ public interface IShipmentsService
     /// его вбивают руками, а хранится он в верхнем регистре.
     /// </summary>
     Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Записывает вердикт ai-inspection-service в акт приёмки и выставляет флаг расхождения с
+    /// оценкой сотрудника. Возвращает <c>false</c>, если груза нет или он ещё не принят (акта,
+    /// куда приписать вердикт, не существует) — для консьюмера это перманентное несоответствие,
+    /// а не временный сбой.
+    /// </summary>
+    Task<bool> ApplyIntegrityAssessmentAsync(Guid shipmentId, PackageIntegrityAssessment assessment, CancellationToken cancellationToken = default);
 }

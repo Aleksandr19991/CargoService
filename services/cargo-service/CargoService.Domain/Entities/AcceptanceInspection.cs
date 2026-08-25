@@ -23,4 +23,19 @@ public class AcceptanceInspection
     public List<Guid> PhotoFileIds { get; set; } = [];
 
     public DateTimeOffset InspectedAt { get; set; }
+
+    // Результат автоматической проверки фото из ai-inspection-service (событие
+    // PackageIntegrityAssessed, spec.md §2.5). Всё nullable: до ответа ИИ — а его может не быть
+    // вовсе, если фото не приложили — полей просто нет.
+    public Guid? AiInspectionJobId { get; set; }
+    public bool? AiDamageDetected { get; set; }
+    public double? AiConfidence { get; set; }
+    public DateTimeOffset? AiAssessedAt { get; set; }
+
+    /// <summary>
+    /// Оценка ИИ разошлась с оценкой сотрудника — повод перепроверить груз. Ставится только при
+    /// достаточной уверенности модели (см. <c>ShipmentsService</c>), поэтому <c>false</c> здесь
+    /// значит «расхождения нет либо ИИ не уверен», а не «ИИ подтвердил».
+    /// </summary>
+    public bool? HasAssessmentDiscrepancy { get; set; }
 }

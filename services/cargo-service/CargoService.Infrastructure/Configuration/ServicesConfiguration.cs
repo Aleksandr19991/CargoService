@@ -7,7 +7,6 @@ namespace CargoService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Consumer PackageIntegrityAssessed (spec.md Фаза 5) регистрируется здесь по мере реализации.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var rabbitMqSection = configuration.GetSection(RabbitMqOptions.SectionName);
@@ -21,6 +20,7 @@ public static class ServicesConfiguration
 
         services.AddSingleton(rabbitMqOptions);
         services.AddHostedService<OrderConfirmedConsumer>();
+        services.AddHostedService<PackageIntegrityAssessedConsumer>();
         services.AddHostedService<OutboxDispatcher>();
 
         return services;

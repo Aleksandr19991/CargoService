@@ -40,5 +40,10 @@ public class AcceptanceInspectionConfiguration : IEntityTypeConfiguration<Accept
             .IsRequired();
 
         builder.HasIndex(inspection => inspection.ShipmentId);
+
+        // Сотрудники ищут акты с расхождением, чтобы перепроверить груз. Частичный индекс:
+        // строк с true меньшинство, остальные (false и «ИИ ещё не отвечал») в индекс не попадают.
+        builder.HasIndex(inspection => inspection.HasAssessmentDiscrepancy)
+            .HasFilter("\"HasAssessmentDiscrepancy\" = true");
     }
 }

@@ -15,6 +15,13 @@ public class ShipmentsService(
 {
     private const string ServiceName = "cargo-service";
 
+    /// <summary>
+    /// Порог уверенности модели, ниже которого её вердикт не считается расхождением. Величина
+    /// бизнесовая, а не техническая: её стоит подкрутить, когда появится статистика ложных
+    /// срабатываний ai-inspection-service (Фаза 8).
+    /// </summary>
+    private const double MinDiscrepancyConfidence = 0.7;
+
     // Тот же алфавит без 0/O/1/I, что у номера заявки в orders-service: трек-номер клиенты
     // диктуют по телефону и вбивают руками, визуально неоднозначные символы здесь дороже всего.
     private const string TrackingAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -207,6 +214,51 @@ public class ShipmentsService(
 
         await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
         return ShipmentOperationResult.Success;
+    }
+
+    public async Task<bool> ApplyIntegrityAssessmentAsync(
+        Guid shipmentId,
+        PackageIntegrityAssessment assessment,
+        CancellationToken cancellationToken = default)
+    {
+        var shipment = await shipmentsRepository.GetByIdWithDetailsAsync(shipmentId, cancellationToken);
+        if (shipment is null)
+            return false;
+
+        // Вердикт приписывается к последнему акту — тому же, к которому цепляются фото,
+        // по которым ИИ и работал.
+        var inspection = shipment.Inspections
+            .OrderByDescending(existing => existing.InspectedAt)
+            .FirstOrDefault();
+
+        if (inspection is null)
+            return false;
+
+        inspection.AiInspectionJobId = assessment.InspectionJobId;
+        inspection.AiDamageDetected = assessment.DamageDetected;
+        inspection.AiConfidence = assessment.Confidence;
+        inspection.AiAssessedAt = DateTimeOffset.UtcNow;
+        inspection.HasAssessmentDiscrepancy = IsDiscrepancy(inspection.PackagingCondition, assessment);
+
+        await shipmentsRepository.UpdateAsync(shipment, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Событие называется PackageIntegrityAssessed и приходит от модели, смотрящей на фото
+    /// упаковки, — поэтому сравниваем именно с <see cref="AcceptanceInspection.PackagingCondition"/>,
+    /// а не с состоянием груза внутри: содержимое коробки по внешнему снимку не оценить.
+    /// Расхождением считается любое несовпадение в обе стороны — и «ИИ увидел повреждение,
+    /// сотрудник нет», и наоборот: второе тоже стоит перепроверить.
+    /// </summary>
+    private static bool IsDiscrepancy(PackagingCondition humanVerdict, PackageIntegrityAssessment assessment)
+    {
+        // Неуверенный вердикт расхождением не считаем. Иначе догадка модели с уверенностью 0.51
+        // поднимала бы алерт на корректно принятом грузе, и склад быстро перестал бы верить флагу.
+        if (assessment.Confidence < MinDiscrepancyConfidence)
+            return false;
+
+        return assessment.DamageDetected != (humanVerdict == PackagingCondition.Damaged);
     }
 
     private void EnqueueCargoAccepted(Shipment shipment, ShipmentAcceptance acceptance)
