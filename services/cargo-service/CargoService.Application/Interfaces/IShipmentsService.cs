@@ -10,7 +10,7 @@ public interface IShipmentsService
     /// <c>Created</c> и первую запись в историю статусов. Идемпотентна — возвращает
     /// <c>null</c>, если груз по этой заявке уже существует (повторная доставка OrderConfirmed).
     /// </summary>
-    Task<Shipment?> CreateFromConfirmedOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<Shipment?> CreateFromConfirmedOrderAsync(Guid orderId, DateTimeOffset? deliveryDeadline, CancellationToken cancellationToken = default);
 
     /// <summary>Полная карточка груза со всеми актами, услугами упаковки и историей статусов.</summary>
     Task<Shipment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -50,4 +50,11 @@ public interface IShipmentsService
     /// а не временный сбой.
     /// </summary>
     Task<bool> ApplyIntegrityAssessmentAsync(Guid shipmentId, PackageIntegrityAssessment assessment, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Переводит просроченные по сроку доставки грузы в статус <c>Delayed</c> с записью в историю
+    /// и публикацией <c>CargoStatusChanged</c>. Возвращает число помеченных за проход. Вызывается
+    /// фоновой джобой контроля SLA.
+    /// </summary>
+    Task<int> FlagOverdueShipmentsAsync(int batchSize, CancellationToken cancellationToken = default);
 }

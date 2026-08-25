@@ -20,6 +20,13 @@ public class Shipment
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>
+    /// Срок доставки из заявки (приезжает в OrderConfirmed). По нему джоба контроля SLA
+    /// автоматически переводит просроченные грузы в <see cref="ShipmentStatus.Delayed"/>.
+    /// Null — клиент срок не указал, SLA по этому грузу не контролируется.
+    /// </summary>
+    public DateTimeOffset? DeliveryDeadline { get; set; }
+
     public ICollection<AcceptanceInspection> Inspections { get; set; } = new List<AcceptanceInspection>();
     public ICollection<PackagingService> PackagingServices { get; set; } = new List<PackagingService>();
     public ICollection<ShipmentStatusHistory> StatusHistory { get; set; } = new List<ShipmentStatusHistory>();

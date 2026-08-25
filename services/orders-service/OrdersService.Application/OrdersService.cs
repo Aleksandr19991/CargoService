@@ -156,6 +156,9 @@ public class OrdersService(
             OrderId = order.Id,
             OrderNumber = order.Number!,
             CalculatedPrice = order.CalculatedPrice.GetValueOrDefault(),
+            // Нужен cargo-service для контроля SLA — иначе ему пришлось бы ходить за сроком
+            // синхронно сюда же.
+            DeliveryDeadline = order.DeliveryDeadline,
         }, nameof(OrderConfirmed));
     }
 

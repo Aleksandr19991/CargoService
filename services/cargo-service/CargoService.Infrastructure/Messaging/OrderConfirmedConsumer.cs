@@ -114,7 +114,8 @@ public class OrderConfirmedConsumer(
             using var scope = scopeFactory.CreateScope();
             var shipmentsService = scope.ServiceProvider.GetRequiredService<IShipmentsService>();
 
-            var shipment = await shipmentsService.CreateFromConfirmedOrderAsync(orderConfirmed.OrderId, stoppingToken);
+            var shipment = await shipmentsService.CreateFromConfirmedOrderAsync(
+                orderConfirmed.OrderId, orderConfirmed.DeliveryDeadline, stoppingToken);
 
             if (shipment is not null)
             {

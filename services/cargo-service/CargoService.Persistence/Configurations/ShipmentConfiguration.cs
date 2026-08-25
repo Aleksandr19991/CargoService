@@ -29,6 +29,11 @@ public class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         builder.Property(shipment => shipment.CreatedAt)
             .IsRequired();
 
+        // Джоба контроля SLA выбирает просроченные грузы по паре «срок + текущий статус».
+        // Частичный индекс: у грузов без срока SLA не контролируется, в индексе они не нужны.
+        builder.HasIndex(shipment => new { shipment.DeliveryDeadline, shipment.CurrentStatus })
+            .HasFilter("\"DeliveryDeadline\" IS NOT NULL");
+
         // Публичный трекинг ищет строго по этому полю, и оно же — идентификатор в глазах клиента.
         builder.HasIndex(shipment => shipment.TrackingNumber)
             .IsUnique();

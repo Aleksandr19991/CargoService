@@ -1,5 +1,6 @@
 using CargoService.Infrastructure.Messaging;
 using CargoService.Infrastructure.Outbox;
+using CargoService.Infrastructure.Sla;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,10 @@ public static class ServicesConfiguration
         services.AddHostedService<OrderConfirmedConsumer>();
         services.AddHostedService<PackageIntegrityAssessedConsumer>();
         services.AddHostedService<OutboxDispatcher>();
+
+        // Контроль SLA к RabbitMQ отношения не имеет — ходит только в БД, — но живёт здесь же,
+        // потому что это такой же фоновый рабочий процесс сервиса.
+        services.AddHostedService<SlaMonitor>();
 
         return services;
     }

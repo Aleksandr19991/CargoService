@@ -14,6 +14,9 @@ public sealed record ShipmentResponse
     public required ShipmentStatus CurrentStatus { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 
+    /// <summary>Срок доставки из заявки; по нему джоба контроля SLA помечает груз задерживающимся.</summary>
+    public DateTimeOffset? DeliveryDeadline { get; init; }
+
     public required List<AcceptanceInspectionResponse> Inspections { get; init; }
     public required List<PackagingServiceResponse> PackagingServices { get; init; }
     public required List<ShipmentStatusHistoryResponse> StatusHistory { get; init; }

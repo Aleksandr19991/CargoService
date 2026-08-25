@@ -22,13 +22,33 @@ public class ShipmentsService(
     /// </summary>
     private const double MinDiscrepancyConfidence = 0.7;
 
+    /// <summary>
+    /// Статусы, из которых просрочка срока переводит груз в <c>Delayed</c>. Намеренно не входят:
+    /// <c>Delayed</c> (уже помечен — иначе джоба переставляла бы статус на каждом проходе),
+    /// <c>Delivered</c> (доставлен), <c>Problem</c> (с ним уже разбирается человек, автоматика
+    /// не должна затирать его статус) и <c>ReadyForPickup</c> — груз довезён до места и ждёт
+    /// клиента, обязательство перевозчика выполнено, и метка «задерживается» вводила бы в
+    /// заблуждение.
+    /// </summary>
+    private static readonly ShipmentStatus[] SlaEligibleStatuses =
+    [
+        ShipmentStatus.Created,
+        ShipmentStatus.Accepted,
+        ShipmentStatus.InWarehouse,
+        ShipmentStatus.InTransit,
+        ShipmentStatus.ArrivedAtDestination,
+    ];
+
     // Тот же алфавит без 0/O/1/I, что у номера заявки в orders-service: трек-номер клиенты
     // диктуют по телефону и вбивают руками, визуально неоднозначные символы здесь дороже всего.
     private const string TrackingAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private const int TrackingSuffixLength = 10;
     private const string TrackingPrefix = "CS-";
 
-    public async Task<Shipment?> CreateFromConfirmedOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+    public async Task<Shipment?> CreateFromConfirmedOrderAsync(
+        Guid orderId,
+        DateTimeOffset? deliveryDeadline,
+        CancellationToken cancellationToken = default)
     {
         // Обычную повторную доставку события отсекаем здесь — дёшево и, главное, без исключения
         // на стороне EF (см. комментарий в ShipmentsRepository.TryCreateAsync про шум в логах).
@@ -44,6 +64,7 @@ public class ShipmentsService(
             TrackingNumber = GenerateTrackingNumber(),
             CurrentStatus = ShipmentStatus.Created,
             CreatedAt = now,
+            DeliveryDeadline = deliveryDeadline,
         };
 
         // Первая запись истории заводится сразу, чтобы трекинг с самого начала показывал
@@ -259,6 +280,31 @@ public class ShipmentsService(
             return false;
 
         return assessment.DamageDetected != (humanVerdict == PackagingCondition.Damaged);
+    }
+
+    public async Task<int> FlagOverdueShipmentsAsync(int batchSize, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var overdue = await shipmentsRepository.GetOverdueAsync(now, SlaEligibleStatuses, batchSize, cancellationToken);
+        if (overdue.Count == 0)
+            return 0;
+
+        foreach (var shipment in overdue)
+        {
+            shipment.CurrentStatus = ShipmentStatus.Delayed;
+            shipment.StatusHistory.Add(new ShipmentStatusHistory
+            {
+                Status = ShipmentStatus.Delayed,
+                ChangedAt = now,
+                Comment = $"Автоматически: срок доставки {shipment.DeliveryDeadline:yyyy-MM-dd HH:mm} истёк.",
+            });
+
+            EnqueueCargoStatusChanged(shipment, ShipmentStatus.Delayed, location: null);
+        }
+
+        // Статусы, записи истории и строки outbox по всей пачке уходят одной транзакцией.
+        await shipmentsRepository.UpdateRangeAsync(overdue, cancellationToken);
+        return overdue.Count;
     }
 
     private void EnqueueCargoAccepted(Shipment shipment, ShipmentAcceptance acceptance)

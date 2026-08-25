@@ -1,5 +1,6 @@
 using CargoService.Application.Interfaces;
 using CargoService.Domain.Entities;
+using CargoService.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -57,6 +58,13 @@ public class ShipmentsRepository(AppDbContext context) : IShipmentsRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateRangeAsync(IReadOnlyCollection<Shipment> shipments, CancellationToken cancellationToken = default)
+    {
+        // Все грузы пачки отслеживаются одним контекстом, поэтому один SaveChanges сохраняет их
+        // все в одной транзакции — отдельный метод существует ради читаемости вызова.
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default)
     {
         // Только чтение — отслеживать нечего.
@@ -64,5 +72,23 @@ public class ShipmentsRepository(AppDbContext context) : IShipmentsRepository
             .AsNoTracking()
             .Include(shipment => shipment.StatusHistory)
             .FirstOrDefaultAsync(shipment => shipment.TrackingNumber == trackingNumber, cancellationToken);
+    }
+
+    public async Task<List<Shipment>> GetOverdueAsync(
+        DateTimeOffset asOf,
+        IReadOnlyCollection<ShipmentStatus> eligibleStatuses,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        // Отслеживаемые (без AsNoTracking): вызывающий меняет статус и дописывает историю.
+        // Пачками, чтобы одна просроченная тысяча не превратилась в один гигантский SaveChanges.
+        return await context.Shipments
+            .Include(shipment => shipment.StatusHistory)
+            .Where(shipment => shipment.DeliveryDeadline != null
+                && shipment.DeliveryDeadline < asOf
+                && eligibleStatuses.Contains(shipment.CurrentStatus))
+            .OrderBy(shipment => shipment.DeliveryDeadline)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
     }
 }

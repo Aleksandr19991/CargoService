@@ -1,4 +1,5 @@
 using CargoService.Domain.Entities;
+using CargoService.Domain.Enums;
 
 namespace CargoService.Application.Interfaces;
 
@@ -20,9 +21,22 @@ public interface IShipmentsRepository
 
     Task UpdateAsync(Shipment shipment, CancellationToken cancellationToken = default);
 
+    /// <summary>Сохраняет изменения сразу по нескольким отслеживаемым грузам одной транзакцией.</summary>
+    Task UpdateRangeAsync(IReadOnlyCollection<Shipment> shipments, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Груз по трек-номеру вместе с историей статусов — для публичного трекинга. Акты приёмки и
     /// услуги упаковки не подтягиваются: наружу они всё равно не отдаются.
     /// </summary>
     Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Грузы, у которых срок доставки истёк, а статус ещё входит в <paramref name="eligibleStatuses"/>.
+    /// Отслеживаемые, с историей статусов: джоба контроля SLA дописывает им запись и сохраняет.
+    /// </summary>
+    Task<List<Shipment>> GetOverdueAsync(
+        DateTimeOffset asOf,
+        IReadOnlyCollection<ShipmentStatus> eligibleStatuses,
+        int batchSize,
+        CancellationToken cancellationToken = default);
 }
