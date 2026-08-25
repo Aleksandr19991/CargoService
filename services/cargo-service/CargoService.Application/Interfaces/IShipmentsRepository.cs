@@ -14,4 +14,9 @@ public interface IShipmentsRepository
     /// успели пройти <see cref="ExistsByOrderIdAsync"/> до вставки.
     /// </summary>
     Task<Shipment?> TryCreateAsync(Shipment shipment, CancellationToken cancellationToken = default);
+
+    /// <summary>Груз со всеми дочерними коллекциями. Отслеживаемый — вызывающий мутирует его и сохраняет через <see cref="UpdateAsync"/>.</summary>
+    Task<Shipment?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task UpdateAsync(Shipment shipment, CancellationToken cancellationToken = default);
 }

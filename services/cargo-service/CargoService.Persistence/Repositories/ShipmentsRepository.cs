@@ -40,4 +40,20 @@ public class ShipmentsRepository(AppDbContext context) : IShipmentsRepository
             return null;
         }
     }
+
+    public async Task<Shipment?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // Без AsNoTracking: приёмка и добавление фото мутируют этот же экземпляр и сохраняют его
+        // голым SaveChangesAsync (как CounterpartiesRepository в clients-service).
+        return await context.Shipments
+            .Include(shipment => shipment.Inspections)
+            .Include(shipment => shipment.PackagingServices)
+            .Include(shipment => shipment.StatusHistory)
+            .FirstOrDefaultAsync(shipment => shipment.Id == id, cancellationToken);
+    }
+
+    public async Task UpdateAsync(Shipment shipment, CancellationToken cancellationToken = default)
+    {
+        await context.SaveChangesAsync(cancellationToken);
+    }
 }
