@@ -1,3 +1,5 @@
+using CargoService.Application.Interfaces;
+using CargoService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +11,8 @@ public static class PersistenceConfiguration
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
+
+        services.AddScoped<IShipmentsRepository, ShipmentsRepository>();
 
         return services;
     }
