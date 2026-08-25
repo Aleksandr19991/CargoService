@@ -132,6 +132,16 @@ public class ShipmentsService(IShipmentsRepository shipmentsRepository) : IShipm
         return ShipmentOperationResult.Success;
     }
 
+    public Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default)
+    {
+        // Трек-номер приходит из адресной строки, набранный человеком: приводим к тому виду, в
+        // котором он лежит в БД, иначе поиск по точному совпадению промахнётся на «cs-...» или
+        // на скопированном с пробелом номере.
+        var normalized = trackingNumber.Trim().ToUpperInvariant();
+
+        return shipmentsRepository.GetByTrackingNumberAsync(normalized, cancellationToken);
+    }
+
     public async Task<ShipmentOperationResult> ChangeStatusAsync(
         Guid id,
         ShipmentStatusChange change,

@@ -22,6 +22,18 @@ public class MappingRegister : IRegister
         config.NewConfig<Shipment, ShipmentResponse>()
             .Map(dest => dest.StatusHistory, src => src.StatusHistory.OrderBy(history => history.ChangedAt));
 
+        config.NewConfig<ShipmentStatusHistory, ShipmentTrackingHistoryResponse>();
+
+        // Публичный трекинг: перечисляем поля поимённо, а не полагаемся на совпадение имён.
+        // Так добавление поля в Shipment не утечёт наружу само собой — что для анонимного
+        // эндпоинта важнее краткости (список исключённого — в докблоке ShipmentTrackingResponse).
+        config.NewConfig<Shipment, ShipmentTrackingResponse>()
+            .Map(dest => dest.TrackingNumber, src => src.TrackingNumber)
+            .Map(dest => dest.CurrentStatus, src => src.CurrentStatus)
+            .Map(dest => dest.CreatedAt, src => src.CreatedAt)
+            .Map(dest => dest.History, src => src.StatusHistory.OrderBy(history => history.ChangedAt))
+            .IgnoreNonMapped(true);
+
         // AcceptShipmentRequest → ShipmentAcceptance намеренно собирается вручную в контроллере:
         // InspectedByUserId берётся из токена, а не из тела запроса, и маппер про него не знает.
     }

@@ -19,4 +19,10 @@ public interface IShipmentsRepository
     Task<Shipment?> GetByIdWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(Shipment shipment, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Груз по трек-номеру вместе с историей статусов — для публичного трекинга. Акты приёмки и
+    /// услуги упаковки не подтягиваются: наружу они всё равно не отдаются.
+    /// </summary>
+    Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default);
 }

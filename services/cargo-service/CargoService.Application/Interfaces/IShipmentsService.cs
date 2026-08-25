@@ -36,4 +36,10 @@ public interface IShipmentsService
     /// недопустимые значения сами по себе, а не следствие текущего состояния.
     /// </summary>
     Task<ShipmentOperationResult> ChangeStatusAsync(Guid id, ShipmentStatusChange change, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Груз по трек-номеру для публичного трекинга. Номер нормализуется (регистр и пробелы) —
+    /// его вбивают руками, а хранится он в верхнем регистре.
+    /// </summary>
+    Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default);
 }

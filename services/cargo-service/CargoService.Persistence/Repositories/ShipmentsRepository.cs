@@ -56,4 +56,13 @@ public class ShipmentsRepository(AppDbContext context) : IShipmentsRepository
     {
         await context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<Shipment?> GetByTrackingNumberAsync(string trackingNumber, CancellationToken cancellationToken = default)
+    {
+        // Только чтение — отслеживать нечего.
+        return await context.Shipments
+            .AsNoTracking()
+            .Include(shipment => shipment.StatusHistory)
+            .FirstOrDefaultAsync(shipment => shipment.TrackingNumber == trackingNumber, cancellationToken);
+    }
 }
