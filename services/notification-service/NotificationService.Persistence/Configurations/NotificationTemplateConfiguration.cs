@@ -80,7 +80,7 @@ public class NotificationTemplateConfiguration : IEntityTypeConfiguration<Notifi
             Code = NotificationTemplateCodes.CargoAccepted,
             Channel = NotificationChannel.Email,
             Subject = "Груз принят на склад, трек-номер {{TrackingNumber}}",
-            Body = "Груз принят на склад.\n\nТрек-номер для отслеживания — {{TrackingNumber}}.\nСостояние упаковки при приёмке: {{PackagingCondition}}.\nСостояние груза: {{CargoCondition}}.",
+            Body = "Груз по заявке {{OrderNumber}} принят на склад.\n\nТрек-номер для отслеживания — {{TrackingNumber}}.\nСостояние упаковки при приёмке: {{PackagingCondition}}.\nСостояние груза: {{CargoCondition}}.",
         },
         new()
         {
@@ -103,16 +103,16 @@ public class NotificationTemplateConfiguration : IEntityTypeConfiguration<Notifi
             Id = Guid.Parse("00000000-0000-0000-0001-000000000007"),
             Code = NotificationTemplateCodes.PaymentCompleted,
             Channel = NotificationChannel.Email,
-            Subject = "Оплата получена",
-            Body = "Оплата на сумму {{Amount}} руб. получена.\n\nСпасибо!",
+            Subject = "Оплата по заявке {{OrderNumber}} получена",
+            Body = "Оплата по заявке {{OrderNumber}} на сумму {{Amount}} руб. получена.\n\nСпасибо!",
         },
         new()
         {
             Id = Guid.Parse("00000000-0000-0000-0001-000000000008"),
             Code = NotificationTemplateCodes.PaymentFailed,
             Channel = NotificationChannel.Email,
-            Subject = "Оплата не прошла",
-            Body = "Оплату по заявке провести не удалось.\n\nПричина: {{Reason}}.\nПовторите оплату в личном кабинете.",
+            Subject = "Оплата по заявке {{OrderNumber}} не прошла",
+            Body = "Оплату по заявке {{OrderNumber}} провести не удалось.\n\nПричина: {{Reason}}.\nПовторите оплату в личном кабинете.",
         },
         new()
         {
@@ -120,15 +120,18 @@ public class NotificationTemplateConfiguration : IEntityTypeConfiguration<Notifi
             Code = NotificationTemplateCodes.DocumentGenerated,
             Channel = NotificationChannel.Email,
             Subject = "Документ «{{DocumentType}}» готов",
-            Body = "По вашей заявке подготовлен документ: {{DocumentType}}.\n\nОн доступен в личном кабинете.",
+            Body = "По заявке {{OrderNumber}} подготовлен документ: {{DocumentType}}.\n\nОн доступен в личном кабинете.",
         },
         new()
         {
             Id = Guid.Parse("00000000-0000-0000-0001-000000000010"),
             Code = NotificationTemplateCodes.PackageIntegrityAssessed,
             Channel = NotificationChannel.Email,
-            Subject = "Расхождение оценки упаковки по грузу {{ShipmentId}}",
-            Body = "Автоматическая проверка фото разошлась с оценкой сотрудника.\n\nГруз: {{ShipmentId}}.\nПовреждение по мнению модели: {{DamageDetected}} (уверенность {{Confidence}}).\nПроверка: {{InspectionJobId}}.\n\nТребуется перепроверка груза сотрудником склада.",
+            Subject = "Автопроверка нашла повреждение упаковки, груз {{ShipmentId}}",
+            // Про расхождение с оценкой сотрудника здесь не говорится: сравнивает оценки
+            // cargo-service (он же ставит флаг), а это уведомление знает ровно то, что
+            // приехало в событии от модели.
+            Body = "Автоматическая проверка фото выявила повреждение упаковки.\n\nГруз: {{ShipmentId}}.\nУверенность модели: {{Confidence}}.\nПроверка: {{InspectionJobId}}.\n\nТребуется перепроверка груза сотрудником склада.",
         },
 
         new()
