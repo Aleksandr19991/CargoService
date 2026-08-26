@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NotificationService.Application.Interfaces;
+using NotificationService.Persistence.Inbox;
 using NotificationService.Persistence.Repositories;
 
 namespace NotificationService.Persistence.Configuration;
@@ -15,6 +16,7 @@ public static class PersistenceConfiguration
         services.AddScoped<IRecipientsRepository, RecipientsRepository>();
         services.AddScoped<INotificationTemplatesRepository, NotificationTemplatesRepository>();
         services.AddScoped<INotificationLogsRepository, NotificationLogsRepository>();
+        services.AddScoped<IInboxRepository, InboxRepository>();
 
         return services;
     }

@@ -79,7 +79,8 @@ public static class ServicesConfiguration
     /// document-service и ai-inspection-service ещё не построены, их очереди просто останутся
     /// пустыми до Фаз 7–9.
     /// </summary>
-    private static void AddEventConsumer<TEvent>(this IServiceCollection services, string publishingService) =>
+    private static void AddEventConsumer<TEvent>(this IServiceCollection services, string publishingService)
+        where TEvent : IntegrationEvent =>
         services.AddHostedService(provider => new EventConsumer<TEvent>(
             provider.GetRequiredService<IServiceScopeFactory>(),
             provider.GetRequiredService<RabbitMqOptions>(),

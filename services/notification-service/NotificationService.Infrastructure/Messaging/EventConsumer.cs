@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CargoService.Contracts.Events.V1;
 using CargoService.Contracts.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +12,8 @@ namespace NotificationService.Infrastructure.Messaging;
 
 /// <summary>
 /// Обобщённый консьюмер одного события: своя очередь <c>notification-service.{event}</c> с DLQ,
-/// переподключение при обрыве, разбор payload и передача в <see cref="IEventHandler{TEvent}"/>.
+/// переподключение при обрыве, разбор payload, отсев уже обработанных событий (inbox) и
+/// передача в <see cref="IEventHandler{TEvent}"/>.
 /// <para>
 /// В остальных сервисах на каждое событие пишется свой <c>BackgroundService</c>, но там их одно-
 /// два; здесь событий десяток, и десять копий одной топологии были бы десятью местами, где она
@@ -24,6 +26,7 @@ public class EventConsumer<TEvent>(
     RabbitMqOptions options,
     string publishingService,
     ILogger<EventConsumer<TEvent>> logger) : BackgroundService
+    where TEvent : IntegrationEvent
 {
     private const string ConsumingService = "notification-service";
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(10);
@@ -116,9 +119,32 @@ public class EventConsumer<TEvent>(
                 ?? throw new InvalidOperationException($"{EventName} payload deserialized to null.");
 
             using var scope = scopeFactory.CreateScope();
-            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<TEvent>>();
+            var inbox = scope.ServiceProvider.GetRequiredService<IInboxRepository>();
 
+            if (await inbox.IsProcessedAsync(@event.EventId, stoppingToken))
+            {
+                logger.LogInformation(
+                    "{EventName} {EventId} already processed, skipping duplicate delivery",
+                    EventName, @event.EventId);
+                await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, stoppingToken);
+                return;
+            }
+
+            var handler = scope.ServiceProvider.GetRequiredService<IEventHandler<TEvent>>();
             await handler.HandleAsync(@event, stoppingToken);
+
+            // Отметка ставится ПОСЛЕ обработки, а не до неё. Обратный порядок («забронировали и
+            // обрабатываем») терял бы уведомление насовсем, упади сервис между отметкой и
+            // отправкой; при этом порядке падение в том же промежутке приводит к повторной
+            // отправке — лишнее письмо неприятно, но молча не доставленное «груз выдан» хуже.
+            // Отправка писем внешняя и в транзакцию БД не заворачивается, так что выбор здесь
+            // только между этими двумя перекосами.
+            if (!await inbox.TryMarkProcessedAsync(@event.EventId, EventName, stoppingToken))
+            {
+                logger.LogWarning(
+                    "{EventName} {EventId} was processed concurrently, notification may have been sent twice",
+                    EventName, @event.EventId);
+            }
 
             await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false, stoppingToken);
         }
