@@ -23,3 +23,7 @@ GRANT ALL PRIVILEGES ON DATABASE ordersservice TO ordersservice;
 CREATE USER cargoshipments WITH PASSWORD 'cargoshipments';
 CREATE DATABASE cargoshipments OWNER cargoshipments;
 GRANT ALL PRIVILEGES ON DATABASE cargoshipments TO cargoshipments;
+
+CREATE USER notificationservice WITH PASSWORD 'notificationservice';
+CREATE DATABASE notificationservice OWNER notificationservice;
+GRANT ALL PRIVILEGES ON DATABASE notificationservice TO notificationservice;
