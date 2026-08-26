@@ -39,6 +39,34 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "cargo-service",
+      "name": "cargo-service (service account)",
+      "description": "Межсервисные вызовы cargo-service → file-storage-service. Только client_credentials: пользовательских потоков нет, поэтому standardFlow и directAccessGrants выключены.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "cargo-service-dev-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "authorizationServicesEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "identity-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [

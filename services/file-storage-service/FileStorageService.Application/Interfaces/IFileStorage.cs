@@ -20,4 +20,11 @@ public interface IFileStorage
     /// иначе клиент получил бы рабочую на вид ссылку, отдающую 404 от самого хранилища.
     /// </summary>
     Task<FileDownloadTicket?> CreateDownloadTicketAsync(Guid fileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Есть ли файл в хранилище. Нужен сервисам-потребителям, которые хранят у себя ссылки на
+    /// файлы (например, PhotoFileIds в акте приёмки) и обязаны убедиться, что за идентификатором
+    /// действительно что-то стоит.
+    /// </summary>
+    Task<bool> ExistsAsync(Guid fileId, CancellationToken cancellationToken = default);
 }

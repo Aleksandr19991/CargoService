@@ -67,7 +67,7 @@ public class MinioFileStorage(MinioClients clients, MinioOptions options, FileUp
         };
     }
 
-    private async Task<bool> ExistsAsync(Guid fileId, CancellationToken cancellationToken)
+    public async Task<bool> ExistsAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         try
         {

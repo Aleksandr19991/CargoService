@@ -38,6 +38,19 @@ public class FilesController(IFileStorage fileStorage) : ControllerBase
     }
 
     /// <summary>
+    /// Существует ли файл. Отдельно от выдачи ссылки, потому что вызывают это по другому поводу:
+    /// сервисы, хранящие у себя ссылки на файлы (PhotoFileIds в акте приёмки у cargo-service),
+    /// проверяют, что за идентификатором действительно что-то стоит. Просить ради этого ссылку на
+    /// скачивание было бы враньём о намерении и лишней работой по подписи.
+    /// </summary>
+    [HttpHead("{fileId}")]
+    public async Task<IActionResult> FileExists(Guid fileId, CancellationToken cancellationToken)
+    {
+        var exists = await fileStorage.ExistsAsync(fileId, cancellationToken);
+        return exists ? Ok() : NotFound();
+    }
+
+    /// <summary>
     /// Ссылка на скачивание. Доступна любому аутентифицированному пользователю: файл сам по себе
     /// ничего не выдаёт о том, к какой заявке он относится, а знать его id можно, только получив
     /// его из сервиса, который уже проверил права (карточка груза, документы по заявке).
