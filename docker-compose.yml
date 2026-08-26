@@ -54,6 +54,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # Локальный сборщик почты для notification-service: принимает SMTP на 1025 и
+  # показывает письма в UI на http://localhost:8025, наружу ничего не отправляя.
+  # Mailpit, а не более известный MailHog: последний архивирован автором и
+  # обновлений не получает. В проде эти же настройки Smtp:* указывают на
+  # настоящего провайдера (SendGrid/Mailgun принимают почту тем же SMTP).
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: cargoservice-mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI
+
   # Централизованное логирование: каждый сервис пишет структурные логи через
   # Serilog в Seq (см. CLAUDE.md). UI: http://localhost:5341
   seq:
