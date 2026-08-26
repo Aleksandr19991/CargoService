@@ -38,6 +38,29 @@ public class RecipientsRepository(AppDbContext dbContext) : IRecipientsRepositor
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<NotificationPreference?> GetPreferenceAsync(Guid userId, CancellationToken cancellationToken) =>
+        dbContext.NotificationPreferences
+            .AsNoTracking()
+            .FirstOrDefaultAsync(preference => preference.UserId == userId, cancellationToken);
+
+    public async Task UpsertPreferenceAsync(NotificationPreference preference, CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.NotificationPreferences
+            .FirstOrDefaultAsync(stored => stored.UserId == preference.UserId, cancellationToken);
+
+        if (existing is null)
+        {
+            await dbContext.NotificationPreferences.AddAsync(preference, cancellationToken);
+        }
+        else
+        {
+            existing.EmailEnabled = preference.EmailEnabled;
+            existing.SmsEnabled = preference.SmsEnabled;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpsertOrderRecipientAsync(OrderRecipient orderRecipient, CancellationToken cancellationToken)
     {
         var existing = await dbContext.OrderRecipients

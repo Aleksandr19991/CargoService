@@ -39,6 +39,14 @@ public class NotificationsService(
 
         foreach (var template in templates)
         {
+            if (!recipient.IsChannelEnabled(template.Channel))
+            {
+                logger.LogInformation(
+                    "Recipient disabled {Channel}, {TemplateCode} not sent over this channel",
+                    template.Channel, trigger.TemplateCode);
+                continue;
+            }
+
             var contact = ContactFor(template.Channel, recipient);
             if (string.IsNullOrWhiteSpace(contact))
             {
@@ -115,8 +123,15 @@ public class NotificationsService(
                 return null;
             }
 
-            // У служебного адреса нет ни пользователя, ни телефона — только почта.
-            return new ResolvedRecipient(UserId: null, Email: options.StaffEmail, Phone: null, OrderNumber: null);
+            // У служебного адреса нет ни пользователя, ни телефона — только почта. Настройки
+            // каналов к нему тоже неприменимы: это рабочий алерт склада, а не рассылка,
+            // от которой отписываются.
+            return new ResolvedRecipient(
+                UserId: null,
+                Email: options.StaffEmail,
+                Phone: null,
+                OrderNumber: null,
+                Preference: null);
         }
 
         if (trigger.OrderId is not { } orderId)
@@ -151,11 +166,14 @@ public class NotificationsService(
             return null;
         }
 
+        var preference = await recipientsRepository.GetPreferenceAsync(recipient.UserId, cancellationToken);
+
         return new ResolvedRecipient(
             recipient.UserId,
             recipient.Email,
             recipient.Phone,
-            orderRecipient.OrderNumber);
+            orderRecipient.OrderNumber,
+            preference);
     }
 
     /// <summary>
@@ -194,5 +212,23 @@ public class NotificationsService(
         }
     }
 
-    private sealed record ResolvedRecipient(Guid? UserId, string? Email, string? Phone, string? OrderNumber);
+    private sealed record ResolvedRecipient(
+        Guid? UserId,
+        string? Email,
+        string? Phone,
+        string? OrderNumber,
+        NotificationPreference? Preference)
+    {
+        /// <summary>
+        /// Настроек нет — включено всё: клиент их не менял (или это служебный адрес, к которому
+        /// они неприменимы). См. <see cref="NotificationPreference"/> о том, почему молчание
+        /// трактуется как согласие.
+        /// </summary>
+        public bool IsChannelEnabled(NotificationChannel channel) => channel switch
+        {
+            NotificationChannel.Email => Preference?.EmailEnabled ?? true,
+            NotificationChannel.Sms => Preference?.SmsEnabled ?? true,
+            _ => true,
+        };
+    }
 }

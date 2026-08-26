@@ -15,6 +15,7 @@ public static class ServicesConfiguration
         services.AddScoped<INotificationSenderRegistry, NotificationSenderRegistry>();
 
         services.AddScoped<INotificationsService, NotificationsService>();
+        services.AddScoped<IClientNotificationsService, ClientNotificationsService>();
 
         AddEventHandlers(services);
     }
