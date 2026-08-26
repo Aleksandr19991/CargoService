@@ -1,28 +1,49 @@
 using FileStorageService.Application.Interfaces;
 using FileStorageService.Application.Models;
+using Minio.DataModel;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
 
 namespace FileStorageService.Infrastructure.Storage;
 
-public class MinioFileStorage(MinioClients clients, MinioOptions options) : IFileStorage
+public class MinioFileStorage(MinioClients clients, MinioOptions options, FileUploadPolicy uploadPolicy) : IFileStorage
 {
     public async Task<FileUploadTicket> CreateUploadTicketAsync(string contentType, CancellationToken cancellationToken = default)
     {
         var fileId = Guid.NewGuid();
+        var expiresAt = DateTimeOffset.UtcNow.Add(options.UrlLifetime);
 
         // Ключ объекта выводится из идентификатора, поэтому отдельная таблица соответствий
         // «id ↔ объект» не нужна — у сервиса вообще нет своей БД.
-        var url = await clients.Presigning.PresignedPutObjectAsync(new PresignedPutObjectArgs()
-            .WithBucket(options.Bucket)
-            .WithObject(ObjectKey(fileId))
-            .WithExpiry((int)options.UrlLifetime.TotalSeconds));
+        var policy = new PostPolicy();
+        policy.SetBucket(options.Bucket);
+        policy.SetKey(ObjectKey(fileId));
+        policy.SetExpires(expiresAt.UtcDateTime);
+
+        // Оба условия входят в подпись, поэтому проверяет их хранилище, а не мы: подменить их на
+        // клиенте нельзя, не сломав подпись. Именно поэтому здесь POST, а не PUT — у подписанного
+        // PUT ограничить размер нечем.
+        policy.SetContentType(contentType);
+        policy.SetContentRange(1, uploadPolicy.MaxFileSizeBytes);
+
+        var (uri, formFields) = await clients.Presigning.PresignedPostPolicyAsync(policy);
+
+        // SDK возвращает подпись и служебные поля, но само поле Content-Type в форму не кладёт,
+        // хотя условие `eq $Content-Type` в политику записывает. Клиент, отправивший ровно то,
+        // что мы выдали, получал бы 403 «Policy Condition failed» (проверено живым прогоном) —
+        // поэтому дописываем поле сами, чтобы тикет был самодостаточным.
+        var fields = new Dictionary<string, string>(formFields)
+        {
+            ["Content-Type"] = contentType,
+        };
 
         return new FileUploadTicket
         {
             FileId = fileId,
-            UploadUrl = url,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(options.UrlLifetime),
+            UploadUrl = uri.ToString(),
+            FormFields = fields,
+            MaxFileSizeBytes = uploadPolicy.MaxFileSizeBytes,
+            ExpiresAt = expiresAt,
         };
     }
 

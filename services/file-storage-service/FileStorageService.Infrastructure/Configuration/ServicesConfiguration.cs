@@ -1,4 +1,5 @@
 using FileStorageService.Application.Interfaces;
+using FileStorageService.Application.Models;
 using FileStorageService.Infrastructure.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,17 @@ public static class ServicesConfiguration
         var options = MinioOptions.Bind(configuration);
 
         services.AddSingleton(options);
+
+        // Правила загрузки нужны и валидатору запроса в API-слое, поэтому регистрируются
+        // отдельным Application-типом: тянуть настройки хранилища в валидатор незачем.
+        if (options.AllowedContentTypes.Count == 0)
+            throw new InvalidOperationException("Minio:AllowedContentTypes is empty — no file type could ever be uploaded.");
+
+        services.AddSingleton(new FileUploadPolicy
+        {
+            MaxFileSizeBytes = options.MaxFileSizeBytes,
+            AllowedContentTypes = options.AllowedContentTypes,
+        });
         services.AddSingleton(_ =>
         {
             var operations = BuildClient(options, options.Endpoint);

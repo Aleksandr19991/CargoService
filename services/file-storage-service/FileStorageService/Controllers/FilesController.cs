@@ -31,6 +31,8 @@ public class FilesController(IFileStorage fileStorage) : ControllerBase
         {
             FileId = ticket.FileId,
             UploadUrl = ticket.UploadUrl,
+            FormFields = ticket.FormFields,
+            MaxFileSizeBytes = ticket.MaxFileSizeBytes,
             ExpiresAt = ticket.ExpiresAt,
         });
     }

@@ -1,18 +1,19 @@
 using FileStorageService.API.Models.Requests;
+using FileStorageService.Application.Models;
 using FluentValidation;
 
 namespace FileStorageService.API.Validators;
 
 public class CreateUploadUrlRequestValidator : AbstractValidator<CreateUploadUrlRequest>
 {
-    public CreateUploadUrlRequestValidator()
+    public CreateUploadUrlRequestValidator(FileUploadPolicy policy)
     {
-        // Здесь только формальная проверка. Белый список разрешённых типов и лимит размера —
-        // задача 2 Фазы 11.
+        // Тип отсекаем здесь, до обращения к хранилищу: не тратить round-trip на заведомо
+        // неразрешённый файл и дать понятную ошибку вместо отказа от MinIO. Само ограничение
+        // при этом дублируется в подписанной policy — валидатор можно обойти, подпись нет.
         RuleFor(x => x.ContentType)
             .NotEmpty()
-            .MaximumLength(100)
-            .Matches(@"^[-\w.+]+/[-\w.+]+$")
-            .WithMessage("ContentType должен быть MIME-типом вида type/subtype.");
+            .Must(policy.IsContentTypeAllowed)
+            .WithMessage(_ => $"Тип файла не разрешён. Допустимые: {string.Join(", ", policy.AllowedContentTypes)}.");
     }
 }

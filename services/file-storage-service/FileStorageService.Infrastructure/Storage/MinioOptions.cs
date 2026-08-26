@@ -34,6 +34,12 @@ public class MinioOptions
     /// </summary>
     public string? PublicEndpoint { get; init; }
 
+    /// <summary>Предельный размер загружаемого файла; попадает в подписанную policy.</summary>
+    public required long MaxFileSizeBytes { get; init; }
+
+    /// <summary>Белый список MIME-типов, разрешённых к загрузке.</summary>
+    public required IReadOnlyCollection<string> AllowedContentTypes { get; init; }
+
     public static MinioOptions Bind(IConfiguration configuration)
     {
         var section = configuration.GetSection(SectionName);
@@ -47,6 +53,8 @@ public class MinioOptions
             Bucket = section["Bucket"] ?? throw new InvalidOperationException("Minio:Bucket is not configured."),
             UrlLifetime = TimeSpan.FromSeconds(int.Parse(section["UrlLifetimeSeconds"] ?? "900")),
             PublicEndpoint = section["PublicEndpoint"],
+            MaxFileSizeBytes = long.Parse(section["MaxFileSizeBytes"] ?? throw new InvalidOperationException("Minio:MaxFileSizeBytes is not configured.")),
+            AllowedContentTypes = [.. section.GetSection("AllowedContentTypes").GetChildren().Select(child => child.Value!)],
         };
     }
 }
