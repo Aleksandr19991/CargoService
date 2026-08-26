@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="FileStorageService.Application/FileStorageService.Application.csproj" />
+  <Project Path="FileStorageService.Infrastructure/FileStorageService.Infrastructure.csproj" />
+  <Project Path="FileStorageService/FileStorageService.API.csproj" />
+</Solution>
