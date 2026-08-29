@@ -1,12 +1,21 @@
+using CargoService.Contracts.Events.V1;
+using DocumentService.Application.EventHandlers;
+using DocumentService.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DocumentService.Application.Configuration;
 
 public static class ServicesConfiguration
 {
-    // No Application services yet — сервисы сценариев (сборка документов, их выдача) появятся
-    // в следующих задачах Фазы 8.
     public static void AddApplicationServices(this IServiceCollection services)
     {
+        services.AddScoped<IDocumentsService, DocumentsService>();
+
+        // По обработчику на событие; обобщённый консьюмер в Infrastructure находит нужный по
+        // типу события.
+        services.AddScoped<IEventHandler<OrderCreated>, OrderCreatedHandler>();
+        services.AddScoped<IEventHandler<OrderConfirmed>, OrderConfirmedHandler>();
+        services.AddScoped<IEventHandler<CargoAccepted>, CargoAcceptedHandler>();
+        services.AddScoped<IEventHandler<CargoDelivered>, CargoDeliveredHandler>();
     }
 }

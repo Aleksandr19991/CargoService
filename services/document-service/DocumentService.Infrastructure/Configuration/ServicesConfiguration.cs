@@ -1,7 +1,10 @@
+using CargoService.Contracts.Events.V1;
 using DocumentService.Application.Interfaces;
+using DocumentService.Infrastructure.Messaging;
 using DocumentService.Infrastructure.Pdf;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using QuestPDF;
 using QuestPDF.Infrastructure;
 
@@ -9,15 +12,48 @@ namespace DocumentService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Здесь появятся клиент file-storage-service, консьюмеры `CargoAccepted`/`CargoDelivered` и
-    // outbox для `DocumentGenerated` — следующие задачи Фазы 8.
+    // Здесь появятся клиент file-storage-service и outbox для `DocumentGenerated` — следующая
+    // задача Фазы 8.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         AddTrackingCodes(services, configuration);
         AddPdfRenderer(services);
+        AddEventConsumers(services, configuration);
 
         return services;
     }
+
+    /// <summary>
+    /// Четыре подписки: события груза говорят, какие документы понадобились, события заявки
+    /// наполняют сведения для печати (см. <c>OrderSnapshot</c>). Обобщённый консьюмер, как в
+    /// notification-service: подписок больше одной, и копии одной топологии очередей разошлись бы.
+    /// </summary>
+    private static void AddEventConsumers(IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(RabbitMqOptions.SectionName);
+        var options = new RabbitMqOptions
+        {
+            HostName = section["HostName"] ?? throw new InvalidOperationException("RabbitMQ:HostName is not configured."),
+            Port = int.Parse(section["Port"] ?? throw new InvalidOperationException("RabbitMQ:Port is not configured.")),
+            UserName = section["UserName"] ?? throw new InvalidOperationException("RabbitMQ:UserName is not configured."),
+            Password = section["Password"] ?? throw new InvalidOperationException("RabbitMQ:Password is not configured."),
+        };
+
+        services.AddSingleton(options);
+
+        services.AddEventConsumer<OrderCreated>("orders-service");
+        services.AddEventConsumer<OrderConfirmed>("orders-service");
+        services.AddEventConsumer<CargoAccepted>("cargo-service");
+        services.AddEventConsumer<CargoDelivered>("cargo-service");
+    }
+
+    private static void AddEventConsumer<TEvent>(this IServiceCollection services, string publishingService)
+        where TEvent : IntegrationEvent =>
+        services.AddHostedService(provider => new EventConsumer<TEvent>(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<RabbitMqOptions>(),
+            publishingService,
+            provider.GetRequiredService<ILogger<EventConsumer<TEvent>>>()));
 
     private static void AddTrackingCodes(IServiceCollection services, IConfiguration configuration)
     {

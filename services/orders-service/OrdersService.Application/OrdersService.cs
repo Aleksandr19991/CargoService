@@ -146,6 +146,12 @@ public class OrdersService(
             ClientAccountId = order.ClientAccountId,
             OriginCity = order.OriginCity,
             DestinationCity = order.DestinationCity,
+            SenderName = order.Sender.OrganizationOrPersonName,
+            RecipientName = order.Recipient.OrganizationOrPersonName,
+            CargoName = order.CargoName,
+            CargoWeightKg = order.CargoWeight,
+            CargoVolumeM3 = order.CargoVolumeM3,
+            DeclaredValue = order.DeclaredValue,
         }, nameof(OrderCreated));
     }
 

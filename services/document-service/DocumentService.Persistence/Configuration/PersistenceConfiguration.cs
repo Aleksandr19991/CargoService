@@ -1,3 +1,6 @@
+using DocumentService.Application.Interfaces;
+using DocumentService.Persistence.Inbox;
+using DocumentService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +12,10 @@ public static class PersistenceConfiguration
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
+
+        services.AddScoped<IDocumentsRepository, DocumentsRepository>();
+        services.AddScoped<IOrderSnapshotsRepository, OrderSnapshotsRepository>();
+        services.AddScoped<IInboxRepository, InboxRepository>();
 
         return services;
     }
