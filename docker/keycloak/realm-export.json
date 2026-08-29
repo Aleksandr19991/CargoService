@@ -41,6 +41,34 @@
       ]
     },
     {
+      "clientId": "ai-inspection-service",
+      "name": "ai-inspection-service (service account)",
+      "description": "Межсервисные вызовы ai-inspection-service → file-storage-service (скачивание фото на инференс). Только client_credentials.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "ai-inspection-service-dev-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "authorizationServicesEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "identity-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "cargo-service",
       "name": "cargo-service (service account)",
       "description": "Межсервисные вызовы cargo-service → file-storage-service. Только client_credentials: пользовательских потоков нет, поэтому standardFlow и directAccessGrants выключены.",

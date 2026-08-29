@@ -18,8 +18,19 @@ public interface IFileStorage
     /// <summary>
     /// Presigned GET-ссылка на существующий файл. <c>null</c>, если файла с таким id в хранилище нет —
     /// иначе клиент получил бы рабочую на вид ссылку, отдающую 404 от самого хранилища.
+    /// <para>
+    /// <paramref name="forInternalNetwork"/> подписывает ссылку на внутренний адрес хранилища
+    /// вместо публичного. Нужно сервисам, которые скачивают файлы сами, изнутри docker-сети
+    /// (ai-inspection-service берёт так фото на инференс): публичный адрес — это
+    /// <c>localhost:9000</c> браузера пользователя, из контейнера он ведёт в сам контейнер.
+    /// Переписать хост в готовой ссылке нельзя — он входит в подпись SigV4 (см. MinioClients),
+    /// поэтому выбор адреса делается до подписи.
+    /// </para>
     /// </summary>
-    Task<FileDownloadTicket?> CreateDownloadTicketAsync(Guid fileId, CancellationToken cancellationToken = default);
+    Task<FileDownloadTicket?> CreateDownloadTicketAsync(
+        Guid fileId,
+        bool forInternalNetwork = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Есть ли файл в хранилище. Нужен сервисам-потребителям, которые хранят у себя ссылки на

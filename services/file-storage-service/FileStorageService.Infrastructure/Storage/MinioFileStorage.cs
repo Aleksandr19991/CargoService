@@ -47,14 +47,21 @@ public class MinioFileStorage(MinioClients clients, MinioOptions options, FileUp
         };
     }
 
-    public async Task<FileDownloadTicket?> CreateDownloadTicketAsync(Guid fileId, CancellationToken cancellationToken = default)
+    public async Task<FileDownloadTicket?> CreateDownloadTicketAsync(
+        Guid fileId,
+        bool forInternalNetwork = false,
+        CancellationToken cancellationToken = default)
     {
         // Presigned-ссылку хранилище выдаст на любой ключ, существует объект или нет, — поэтому
         // проверяем наличие сами, иначе клиент получил бы рабочую на вид ссылку с 404 внутри.
         if (!await ExistsAsync(fileId, cancellationToken))
             return null;
 
-        var url = await clients.Presigning.PresignedGetObjectAsync(new PresignedGetObjectArgs()
+        // Operations настроен на внутренний адрес: подпись — чистое вычисление, и то, что этим
+        // клиентом обычно делаются настоящие вызовы, ссылке не мешает.
+        var signingClient = forInternalNetwork ? clients.Operations : clients.Presigning;
+
+        var url = await signingClient.PresignedGetObjectAsync(new PresignedGetObjectArgs()
             .WithBucket(options.Bucket)
             .WithObject(ObjectKey(fileId))
             .WithExpiry((int)options.UrlLifetime.TotalSeconds));

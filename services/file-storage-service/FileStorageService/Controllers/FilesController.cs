@@ -55,10 +55,19 @@ public class FilesController(IFileStorage fileStorage) : ControllerBase
     /// ничего не выдаёт о том, к какой заявке он относится, а знать его id можно, только получив
     /// его из сервиса, который уже проверил права (карточка груза, документы по заявке).
     /// </summary>
+    /// <param name="internalNetwork">
+    /// Подписать ссылку на внутренний адрес хранилища (query-параметр <c>internal</c>). Для
+    /// сервисов, которые качают файл сами изнутри docker-сети: публичный адрес ведёт на
+    /// <c>localhost</c> браузера пользователя. Прав это не расширяет — объект тот же, а
+    /// внутренняя ссылка снаружи попросту не открывается.
+    /// </param>
     [HttpGet("{fileId}/download-url")]
-    public async Task<ActionResult<DownloadUrlResponse>> CreateDownloadUrl(Guid fileId, CancellationToken cancellationToken)
+    public async Task<ActionResult<DownloadUrlResponse>> CreateDownloadUrl(
+        Guid fileId,
+        CancellationToken cancellationToken,
+        [FromQuery(Name = "internal")] bool internalNetwork = false)
     {
-        var ticket = await fileStorage.CreateDownloadTicketAsync(fileId, cancellationToken);
+        var ticket = await fileStorage.CreateDownloadTicketAsync(fileId, internalNetwork, cancellationToken);
         if (ticket is null)
             return NotFound();
 
