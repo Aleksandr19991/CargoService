@@ -2,12 +2,15 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="SixLabors.ImageSharp" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\CargoService.Contracts\CargoService.Contracts.csproj" />
     <ProjectReference Include="..\AiInspectionService.Application\AiInspectionService.Application.csproj" />
   </ItemGroup>
 

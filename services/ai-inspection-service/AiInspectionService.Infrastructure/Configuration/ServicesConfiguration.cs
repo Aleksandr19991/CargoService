@@ -1,5 +1,6 @@
 using AiInspectionService.Application.Interfaces;
 using AiInspectionService.Infrastructure.Inference;
+using AiInspectionService.Infrastructure.Messaging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,13 +8,29 @@ namespace AiInspectionService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Здесь же появятся consumer `CargoPhotoUploaded`, outbox-диспетчер для
-    // `PackageIntegrityAssessed` и клиент file-storage-service — следующие задачи Фазы 7.
+    // Здесь же появятся outbox-диспетчер для `PackageIntegrityAssessed` и клиент
+    // file-storage-service — следующие задачи Фазы 7.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         AddInspectionModel(services, configuration);
+        AddEventConsumers(services, configuration);
 
         return services;
+    }
+
+    private static void AddEventConsumers(IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(RabbitMqOptions.SectionName);
+        var options = new RabbitMqOptions
+        {
+            HostName = section["HostName"] ?? throw new InvalidOperationException("RabbitMQ:HostName is not configured."),
+            Port = int.Parse(section["Port"] ?? throw new InvalidOperationException("RabbitMQ:Port is not configured.")),
+            UserName = section["UserName"] ?? throw new InvalidOperationException("RabbitMQ:UserName is not configured."),
+            Password = section["Password"] ?? throw new InvalidOperationException("RabbitMQ:Password is not configured."),
+        };
+
+        services.AddSingleton(options);
+        services.AddHostedService<CargoPhotoUploadedConsumer>();
     }
 
     private static void AddInspectionModel(IServiceCollection services, IConfiguration configuration)

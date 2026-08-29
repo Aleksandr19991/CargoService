@@ -1,3 +1,6 @@
+using AiInspectionService.Application.Interfaces;
+using AiInspectionService.Persistence.Inbox;
+using AiInspectionService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +12,9 @@ public static class PersistenceConfiguration
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
+
+        services.AddScoped<IInspectionJobsRepository, InspectionJobsRepository>();
+        services.AddScoped<IInboxRepository, InboxRepository>();
 
         return services;
     }
