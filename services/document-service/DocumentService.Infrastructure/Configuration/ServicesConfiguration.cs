@@ -13,9 +13,22 @@ public static class ServicesConfiguration
     // outbox для `DocumentGenerated` — следующие задачи Фазы 8.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        AddTrackingCodes(services, configuration);
         AddPdfRenderer(services);
 
         return services;
+    }
+
+    private static void AddTrackingCodes(IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(TrackingCodeOptions.SectionName);
+
+        services.AddSingleton(new TrackingCodeOptions
+        {
+            PublicTrackingBaseUrl = section["PublicTrackingBaseUrl"],
+        });
+
+        services.AddSingleton<ITrackingCodeGenerator, QrTrackingCodeGenerator>();
     }
 
     private static void AddPdfRenderer(IServiceCollection services)

@@ -27,6 +27,4 @@ public sealed record DamageInspectionActModel
     public double? AiConfidence { get; init; }
 
     public int PhotoCount { get; init; }
-
-    public byte[]? TrackingCodeImage { get; init; }
 }

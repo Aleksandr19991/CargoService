@@ -22,8 +22,11 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
 
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("ru-RU");
 
-    public QuestPdfDocumentRenderer()
+    private readonly ITrackingCodeGenerator trackingCodeGenerator;
+
+    public QuestPdfDocumentRenderer(ITrackingCodeGenerator trackingCodeGenerator)
     {
+        this.trackingCodeGenerator = trackingCodeGenerator;
         DocumentFonts.EnsureRegistered();
     }
 
@@ -32,7 +35,6 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             "Транспортная накладная",
             model.TrackingNumber,
             model.IssuedAt,
-            model.TrackingCodeImage,
             rows =>
             {
                 rows("Номер заявки", model.OrderNumber);
@@ -53,7 +55,6 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             "Акт приёма-передачи груза",
             model.TrackingNumber,
             model.AcceptedAt,
-            model.TrackingCodeImage,
             rows =>
             {
                 rows("Номер заявки", model.OrderNumber);
@@ -70,7 +71,6 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             "Акт осмотра груза при повреждении",
             model.TrackingNumber,
             model.InspectedAt,
-            model.TrackingCodeImage,
             rows =>
             {
                 rows("Номер заявки", model.OrderNumber);
@@ -94,16 +94,20 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             },
             ["Осмотр провёл (склад)", "С актом ознакомлен (клиент)"]);
 
-    private static byte[] Render(
+    private byte[] Render(
         string title,
         string trackingNumber,
         DateTimeOffset issuedAt,
-        byte[]? trackingCodeImage,
         Action<Action<string, string?>> buildRows,
         IReadOnlyList<string> signatures)
     {
         var rows = new List<(string Label, string Value)>();
         buildRows((label, value) => rows.Add((label, string.IsNullOrWhiteSpace(value) ? EmptyValue : value)));
+
+        // Код печатается на каждом документе и собирается здесь, а не приходит в модели: он
+        // выводится из трек-номера, и заставлять вызывающий код помнить о нём значило бы
+        // однажды выпустить бланк без кода.
+        var trackingCodeImage = trackingCodeGenerator.CreateTrackingCode(trackingNumber);
 
         var document = QuestPDF.Fluent.Document.Create(container => container.Page(page =>
         {
@@ -124,7 +128,7 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
         string title,
         string trackingNumber,
         DateTimeOffset issuedAt,
-        byte[]? trackingCodeImage)
+        byte[] trackingCodeImage)
     {
         container.Column(column =>
         {
@@ -136,10 +140,9 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
                     left.Item().Text("Грузоперевозки").FontSize(9).FontColor(Colors.Grey.Darken1);
                 });
 
-                // Код трек-номера появится в задаче 3; пока его может не быть, и место под него
-                // просто не занимается.
-                if (trackingCodeImage is not null)
-                    row.ConstantItem(80).Image(trackingCodeImage);
+                // ~2 см в шапке: код должен читаться телефоном с распечатанного бланка, но не
+                // спорить с ним за место.
+                row.ConstantItem(60).Image(trackingCodeImage);
             });
 
             column.Item().PaddingTop(10).Text(title).FontSize(14).SemiBold();

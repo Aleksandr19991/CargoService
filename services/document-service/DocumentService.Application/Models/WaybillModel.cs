@@ -26,7 +26,4 @@ public sealed record WaybillModel
     public decimal? DeclaredValue { get; init; }
     public decimal? Price { get; init; }
     public DateTimeOffset? DeliveryDeadline { get; init; }
-
-    /// <summary>Штрихкод/QR трек-номера в PNG. Появится в задаче 3; пока может отсутствовать.</summary>
-    public byte[]? TrackingCodeImage { get; init; }
 }

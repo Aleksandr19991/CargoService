@@ -24,6 +24,4 @@ public sealed record AcceptanceActModel
 
     /// <summary>Сколько снимков приложено к приёмке — печатается как отсылка к фотофиксации.</summary>
     public int PhotoCount { get; init; }
-
-    public byte[]? TrackingCodeImage { get; init; }
 }
