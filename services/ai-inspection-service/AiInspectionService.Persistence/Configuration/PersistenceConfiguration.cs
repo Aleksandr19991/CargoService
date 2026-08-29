@@ -1,5 +1,6 @@
 using AiInspectionService.Application.Interfaces;
 using AiInspectionService.Persistence.Inbox;
+using AiInspectionService.Persistence.Outbox;
 using AiInspectionService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,8 @@ public static class PersistenceConfiguration
 
         services.AddScoped<IInspectionJobsRepository, InspectionJobsRepository>();
         services.AddScoped<IInboxRepository, InboxRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }

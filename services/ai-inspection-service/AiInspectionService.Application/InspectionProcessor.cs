@@ -1,22 +1,24 @@
+using System.Text.Json;
 using AiInspectionService.Application.Interfaces;
 using AiInspectionService.Domain.Entities;
+using CargoService.Contracts.Events.V1;
+using CargoService.Contracts.Messaging;
 using Microsoft.Extensions.Logging;
 
 namespace AiInspectionService.Application;
 
 /// <summary>
-/// Конвейер инференса: задание из очереди → снимки из File Storage → модель → вердикты.
-/// <para>
-/// Публикация <c>PackageIntegrityAssessed</c> сюда ещё не входит — она будет добавлена
-/// следующей задачей Фазы 7 вместе с outbox.
-/// </para>
+/// Конвейер инференса: задание из очереди → снимки из File Storage → модель → вердикты →
+/// событие <c>PackageIntegrityAssessed</c> через outbox.
 /// </summary>
 public class InspectionProcessor(
     IInspectionJobsRepository jobsRepository,
     IFileStorageClient fileStorageClient,
     IPackageInspectionModel model,
+    IOutboxWriter outboxWriter,
     ILogger<InspectionProcessor> logger) : IInspectionProcessor
 {
+    private const string PublishingService = "ai-inspection-service";
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
         var job = await jobsRepository.ClaimNextQueuedAsync(cancellationToken);
@@ -39,6 +41,8 @@ public class InspectionProcessor(
                     // Недостающий снимок обрывает задание целиком, а не пропускается: вердикт по
                     // части фотографий не отличить от вердикта по всем, а «повреждений не видно»
                     // на невиденных снимках — ровно та ошибка, ради которой проверку и заводили.
+                    // Событие при этом не публикуется: вердикта нет, а cargo-service записал бы
+                    // в акт приёмки оценку, ни на чём не основанную.
                     await FailAsync(job.Id, $"Снимок {fileId} отсутствует в хранилище.", cancellationToken);
                     return true;
                 }
@@ -57,11 +61,26 @@ public class InspectionProcessor(
                 });
             }
 
+            // Событие ставится в outbox до сохранения: репозиторий делает SaveChanges на том же
+            // DbContext, поэтому вердикты, статус задания и строка outbox коммитятся одной
+            // транзакцией — как в остальных сервисах с outbox (Фазы 4–6).
+            var assessment = Aggregate(job, results);
+            outboxWriter.Enqueue(
+                assessment.EventId,
+                RabbitMqConventions.RoutingKey(PublishingService, nameof(PackageIntegrityAssessed)),
+                JsonSerializer.Serialize(assessment),
+                assessment.OccurredAtUtc);
+
             await jobsRepository.CompleteAsync(job.Id, results, cancellationToken);
 
             logger.LogInformation(
-                "Job {JobId} completed: damage on {DamagedCount} of {PhotoCount} photo(s)",
-                job.Id, results.Count(result => result.DamageDetected), results.Count);
+                "Job {JobId} completed: damage on {DamagedCount} of {PhotoCount} photo(s), " +
+                "published verdict damage={Damage} confidence={Confidence:F3}",
+                job.Id,
+                results.Count(result => result.DamageDetected),
+                results.Count,
+                assessment.DamageDetected,
+                assessment.Confidence);
 
             return true;
         }
@@ -82,6 +101,36 @@ public class InspectionProcessor(
 
             return true;
         }
+    }
+
+    /// <summary>
+    /// Сводит вердикты по снимкам в один — тот, что уходит подписчикам.
+    /// <para>
+    /// Повреждение считается найденным, если оно видно **хоть на одном** снимке: фотографируют
+    /// разные стороны коробки, и вмятина на одной из них — это повреждение груза, а не
+    /// «меньшинство голосов».
+    /// </para>
+    /// <para>
+    /// Уверенность берётся у того снимка, который и решил исход: при найденном повреждении —
+    /// наибольшая среди «повреждённых», иначе — наименьшая среди «целых». Второе намеренно
+    /// осторожно: cargo-service сверяет вердикт с оценкой сотрудника и поднимает флаг
+    /// расхождения только выше порога уверенности (Фаза 5), и завысить здесь уверенность в
+    /// «целостности» значило бы подавлять законные расхождения.
+    /// </para>
+    /// </summary>
+    private static PackageIntegrityAssessed Aggregate(InspectionJob job, IReadOnlyList<InspectionResult> results)
+    {
+        var damaged = results.Where(result => result.DamageDetected).ToList();
+
+        return new PackageIntegrityAssessed
+        {
+            ShipmentId = job.ShipmentId,
+            InspectionJobId = job.Id,
+            DamageDetected = damaged.Count > 0,
+            Confidence = damaged.Count > 0
+                ? damaged.Max(result => result.Confidence)
+                : results.Min(result => result.Confidence),
+        };
     }
 
     private async Task FailAsync(Guid jobId, string reason, CancellationToken cancellationToken)

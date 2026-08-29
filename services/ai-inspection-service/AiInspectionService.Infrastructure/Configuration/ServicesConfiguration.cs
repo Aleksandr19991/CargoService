@@ -3,6 +3,7 @@ using AiInspectionService.Infrastructure.FileStorage;
 using AiInspectionService.Infrastructure.Inference;
 using AiInspectionService.Infrastructure.Keycloak;
 using AiInspectionService.Infrastructure.Messaging;
+using AiInspectionService.Infrastructure.Outbox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Polly;
@@ -92,6 +93,7 @@ public static class ServicesConfiguration
 
         services.AddSingleton(options);
         services.AddHostedService<CargoPhotoUploadedConsumer>();
+        services.AddHostedService<OutboxDispatcher>();
     }
 
     private static void AddInspectionModel(IServiceCollection services, IConfiguration configuration)
