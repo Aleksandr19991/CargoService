@@ -1,6 +1,8 @@
-<Solution>
+﻿<Solution>
   <Project Path="AiInspectionService.Application/AiInspectionService.Application.csproj" />
+  <Project Path="AiInspectionService.Application.Tests/AiInspectionService.Application.Tests.csproj" />
   <Project Path="AiInspectionService.Domain/AiInspectionService.Domain.csproj" />
+  <Project Path="AiInspectionService.IntegrationTests/AiInspectionService.IntegrationTests.csproj" />
   <Project Path="AiInspectionService.Infrastructure/AiInspectionService.Infrastructure.csproj" />
   <Project Path="AiInspectionService.Persistence/AiInspectionService.Persistence.csproj" />
   <Project Path="AiInspectionService/AiInspectionService.API.csproj" />

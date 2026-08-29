@@ -88,6 +88,13 @@ dotnet build AiInspectionService.slnx
 dotnet run --project AiInspectionService
 ```
 
+Тесты:
+
+```
+dotnet test AiInspectionService.Application.Tests   # без внешних зависимостей
+dotnet test AiInspectionService.IntegrationTests    # нужен запущенный Docker-демон (Testcontainers)
+```
+
 Миграции (из `AiInspectionService.Persistence/`):
 
 ```
