@@ -31,3 +31,7 @@ GRANT ALL PRIVILEGES ON DATABASE notificationservice TO notificationservice;
 CREATE USER aiinspectionservice WITH PASSWORD 'aiinspectionservice';
 CREATE DATABASE aiinspectionservice OWNER aiinspectionservice;
 GRANT ALL PRIVILEGES ON DATABASE aiinspectionservice TO aiinspectionservice;
+
+CREATE USER documentservice WITH PASSWORD 'documentservice';
+CREATE DATABASE documentservice OWNER documentservice;
+GRANT ALL PRIVILEGES ON DATABASE documentservice TO documentservice;

@@ -10,10 +10,12 @@ services/
 ├── orders-service/
 ├── cargo-service/
 ├── notification-service/
-└── ai-inspection-service/
+├── ai-inspection-service/
+├── file-storage-service/
+└── document-service/
 ```
 
-Список соответствует разделу 2 spec.md. Дополнительные сервисы из раздела 3 (document-service, payment-service, logistics-service, file-storage-service, reporting-service) добавляются сюда по мере реализации соответствующих фаз.
+Первые семь папок соответствуют разделу 2 spec.md, остальные — дополнительные сервисы из раздела 3; они добавляются сюда по мере реализации соответствующих фаз (ещё не созданы: payment-service, logistics-service, reporting-service, api-gateway).
 
 Внутри папки сервиса — проекты по слоям Clean Architecture (`{ServiceName}.Domain`, `.Application`, `.Persistence`, `.Infrastructure`, `.API`), см. раздел 1 [spec.md](../spec.md).
 

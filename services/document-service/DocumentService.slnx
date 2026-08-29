@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DocumentService.Application/DocumentService.Application.csproj" />
+  <Project Path="DocumentService.Domain/DocumentService.Domain.csproj" />
+  <Project Path="DocumentService.Infrastructure/DocumentService.Infrastructure.csproj" />
+  <Project Path="DocumentService.Persistence/DocumentService.Persistence.csproj" />
+  <Project Path="DocumentService/DocumentService.API.csproj" />
+</Solution>
