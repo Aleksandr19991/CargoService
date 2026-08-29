@@ -27,3 +27,7 @@ GRANT ALL PRIVILEGES ON DATABASE cargoshipments TO cargoshipments;
 CREATE USER notificationservice WITH PASSWORD 'notificationservice';
 CREATE DATABASE notificationservice OWNER notificationservice;
 GRANT ALL PRIVILEGES ON DATABASE notificationservice TO notificationservice;
+
+CREATE USER aiinspectionservice WITH PASSWORD 'aiinspectionservice';
+CREATE DATABASE aiinspectionservice OWNER aiinspectionservice;
+GRANT ALL PRIVILEGES ON DATABASE aiinspectionservice TO aiinspectionservice;
