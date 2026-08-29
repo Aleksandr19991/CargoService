@@ -1,4 +1,6 @@
+using System.Globalization;
 using AiInspectionService.Application.Interfaces;
+using AiInspectionService.Application.Models;
 using AiInspectionService.Infrastructure.FileStorage;
 using AiInspectionService.Infrastructure.Inference;
 using AiInspectionService.Infrastructure.Keycloak;
@@ -103,9 +105,25 @@ public static class ServicesConfiguration
         {
             Path = section["Path"],
             Version = section["Version"] ?? "unknown",
+            EvaluationSetPath = section["EvaluationSetPath"],
         };
 
         services.AddSingleton(options);
+
+        // Тип объявлен в Application (порог — бизнес-правило, а не свойство файла модели),
+        // заполняется здесь: про IConfiguration знает только Infrastructure.
+        services.AddSingleton(new InspectionOptions
+        {
+            DamageConfidenceThreshold = double.TryParse(
+                section["DamageConfidenceThreshold"],
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var threshold)
+                ? threshold
+                : new InspectionOptions().DamageConfidenceThreshold,
+        });
+
+        services.AddScoped<IEvaluationSetSource, DirectoryEvaluationSetSource>();
 
         // Singleton: InferenceSession держит веса в памяти и потокобезопасна на Run — создавать
         // её на запрос значило бы перечитывать модель с диска на каждый снимок.

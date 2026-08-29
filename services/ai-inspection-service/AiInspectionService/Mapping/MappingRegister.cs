@@ -1,4 +1,5 @@
 using AiInspectionService.API.Models.Responses;
+using AiInspectionService.Application.Models;
 using AiInspectionService.Domain.Entities;
 using Mapster;
 
@@ -24,5 +25,11 @@ public class MappingRegister : IRegister
 
         // CreateInspectionRequest в сущность не маппится: задание собирает Application-сервис,
         // проставляя статус и время, — контроллер передаёт ему только поля запроса.
+
+        // Precision/Recall/F1/Accuracy — вычисляемые свойства матрицы, Mapster переносит их
+        // как обычные значения; CurrentThreshold в отчёте нет — его добавляет контроллер.
+        config.NewConfig<ConfusionMatrix, ConfusionMatrixResponse>();
+        config.NewConfig<ModelEvaluationReport, ModelEvaluationResponse>()
+            .Ignore(dest => dest.CurrentThreshold);
     }
 }

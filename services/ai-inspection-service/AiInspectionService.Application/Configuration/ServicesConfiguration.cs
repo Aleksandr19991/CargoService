@@ -9,5 +9,6 @@ public static class ServicesConfiguration
     {
         services.AddScoped<IInspectionJobsService, InspectionJobsService>();
         services.AddScoped<IInspectionProcessor, InspectionProcessor>();
+        services.AddScoped<IModelEvaluator, ModelEvaluator>();
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AiInspectionService.Application.Interfaces;
+using AiInspectionService.Application.Models;
 using AiInspectionService.Domain.Entities;
 using CargoService.Contracts.Events.V1;
 using CargoService.Contracts.Messaging;
@@ -16,6 +17,7 @@ public class InspectionProcessor(
     IFileStorageClient fileStorageClient,
     IPackageInspectionModel model,
     IOutboxWriter outboxWriter,
+    InspectionOptions options,
     ILogger<InspectionProcessor> logger) : IInspectionProcessor
 {
     private const string PublishingService = "ai-inspection-service";
@@ -106,21 +108,23 @@ public class InspectionProcessor(
     /// <summary>
     /// Сводит вердикты по снимкам в один — тот, что уходит подписчикам.
     /// <para>
-    /// Повреждение считается найденным, если оно видно **хоть на одном** снимке: фотографируют
+    /// Повреждение считается найденным, если оно видно **хоть на одном** снимке и модель уверена
+    /// не ниже порога (<see cref="InspectionOptions.DamageConfidenceThreshold"/>): фотографируют
     /// разные стороны коробки, и вмятина на одной из них — это повреждение груза, а не
-    /// «меньшинство голосов».
+    /// «меньшинство голосов»; но догадка с уверенностью чуть выше половины — не повреждение.
     /// </para>
     /// <para>
-    /// Уверенность берётся у того снимка, который и решил исход: при найденном повреждении —
-    /// наибольшая среди «повреждённых», иначе — наименьшая среди «целых». Второе намеренно
-    /// осторожно: cargo-service сверяет вердикт с оценкой сотрудника и поднимает флаг
-    /// расхождения только выше порога уверенности (Фаза 5), и завысить здесь уверенность в
-    /// «целостности» значило бы подавлять законные расхождения.
+    /// Уверенность берётся у снимка, решившего исход: при найденном повреждении — наибольшая
+    /// среди сработавших, иначе — наименьшая оценка целостности по всем снимкам. Второе
+    /// намеренно осторожно и учитывает слабые сигналы повреждения, не дотянувшие до порога:
+    /// вердикт «цело» настолько надёжен, насколько надёжен худший снимок.
     /// </para>
     /// </summary>
-    private static PackageIntegrityAssessed Aggregate(InspectionJob job, IReadOnlyList<InspectionResult> results)
+    private PackageIntegrityAssessed Aggregate(InspectionJob job, IReadOnlyList<InspectionResult> results)
     {
-        var damaged = results.Where(result => result.DamageDetected).ToList();
+        var damaged = results
+            .Where(result => result.DamageDetected && result.Confidence >= options.DamageConfidenceThreshold)
+            .ToList();
 
         return new PackageIntegrityAssessed
         {
@@ -129,7 +133,7 @@ public class InspectionProcessor(
             DamageDetected = damaged.Count > 0,
             Confidence = damaged.Count > 0
                 ? damaged.Max(result => result.Confidence)
-                : results.Min(result => result.Confidence),
+                : results.Min(result => result.PackagingIntegrityScore),
         };
     }
 

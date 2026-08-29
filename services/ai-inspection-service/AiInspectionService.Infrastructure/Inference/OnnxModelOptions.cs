@@ -24,4 +24,10 @@ public sealed class OnnxModelOptions
     /// обязательного поля версии, а сравнивать результаты по хэшу файла неудобно.
     /// </summary>
     public string Version { get; init; } = "unknown";
+
+    /// <summary>
+    /// Папка с размеченным тестовым набором (<c>damaged/</c> и <c>intact/</c> внутри). Пусто —
+    /// оценка качества недоступна; в репозиторий и образ набор не кладётся.
+    /// </summary>
+    public string? EvaluationSetPath { get; init; }
 }
