@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\CargoService.Contracts\CargoService.Contracts.csproj" />
+    <ProjectReference Include="..\PaymentService.Domain\PaymentService.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

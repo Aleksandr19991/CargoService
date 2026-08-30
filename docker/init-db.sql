@@ -35,3 +35,7 @@ GRANT ALL PRIVILEGES ON DATABASE aiinspectionservice TO aiinspectionservice;
 CREATE USER documentservice WITH PASSWORD 'documentservice';
 CREATE DATABASE documentservice OWNER documentservice;
 GRANT ALL PRIVILEGES ON DATABASE documentservice TO documentservice;
+
+CREATE USER paymentservice WITH PASSWORD 'paymentservice';
+CREATE DATABASE paymentservice OWNER paymentservice;
+GRANT ALL PRIVILEGES ON DATABASE paymentservice TO paymentservice;
