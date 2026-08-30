@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using PaymentService.Application.Interfaces;
 using PaymentService.Application.Models;
 using PaymentService.Infrastructure.Messaging;
+using PaymentService.Infrastructure.Outbox;
 using PaymentService.Infrastructure.Payments;
 using Polly;
 using Polly.Extensions.Http;
@@ -14,12 +15,13 @@ namespace PaymentService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Дальше сюда добавится outbox для `PaymentCompleted`/`PaymentFailed`/`RefundIssued` —
-    // следующие задачи Фазы 9 (spec.md).
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         AddPaymentProvider(services, configuration);
         AddEventConsumers(services, configuration);
+
+        // Публикация PaymentCompleted/PaymentFailed из транзакционного outbox.
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }
@@ -75,12 +77,18 @@ public static class ServicesConfiguration
 
         services.AddSingleton(options);
 
-        // Валюта нужна сценариям Application (в счёте), но собственного ключа у неё нет — иначе
-        // два ключа разъехались бы, и счёт выставлялся бы в одной валюте, а платёж заводился в другой.
-        services.AddSingleton(new PaymentOptions { Currency = options.Currency });
-
         var isProviderConfigured = !string.IsNullOrWhiteSpace(options.ShopId)
             && !string.IsNullOrWhiteSpace(options.SecretKey);
+
+        // Валюта нужна сценариям Application (в счёте), но собственного ключа у неё нет — иначе
+        // два ключа разъехались бы, и счёт выставлялся бы в одной валюте, а платёж заводился в другой.
+        // Перепроверка webhook — тоже не ключ, а следствие: перепроверять статус можно только у
+        // подключённого провайдера (см. докблок PaymentOptions).
+        services.AddSingleton(new PaymentOptions
+        {
+            Currency = options.Currency,
+            VerifyWebhookWithProvider = isProviderConfigured,
+        });
 
         if (!isProviderConfigured)
         {

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PaymentService.Application.Interfaces;
 using PaymentService.Persistence.Inbox;
+using PaymentService.Persistence.Outbox;
 using PaymentService.Persistence.Repositories;
 
 namespace PaymentService.Persistence.Configuration;
@@ -15,6 +16,8 @@ public static class PersistenceConfiguration
 
         services.AddScoped<IInvoicesRepository, InvoicesRepository>();
         services.AddScoped<IInboxRepository, InboxRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }
