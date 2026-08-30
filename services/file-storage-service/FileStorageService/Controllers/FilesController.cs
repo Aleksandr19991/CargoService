@@ -22,13 +22,19 @@ public class FilesController(IFileStorage fileStorage) : ControllerBase
     // в правах значит однажды дать сервису лишнего вместе с расширением роли склада.
     private const string UploadRoles = "WarehouseOperator,Manager,Admin,FileWriter";
 
+    /// <param name="internalNetwork">
+    /// Подписать разрешение на внутренний адрес хранилища (query-параметр <c>internal</c>) — для
+    /// сервисов, которые льют файл изнутри docker-сети. См. тот же параметр у ссылки на
+    /// скачивание.
+    /// </param>
     [HttpPost("upload-url")]
     [Authorize(Roles = UploadRoles)]
     public async Task<ActionResult<UploadUrlResponse>> CreateUploadUrl(
         [FromBody] CreateUploadUrlRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery(Name = "internal")] bool internalNetwork = false)
     {
-        var ticket = await fileStorage.CreateUploadTicketAsync(request.ContentType, cancellationToken);
+        var ticket = await fileStorage.CreateUploadTicketAsync(request.ContentType, internalNetwork, cancellationToken);
 
         return Ok(new UploadUrlResponse
         {

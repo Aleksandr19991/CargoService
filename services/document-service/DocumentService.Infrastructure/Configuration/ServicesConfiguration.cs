@@ -51,6 +51,7 @@ public static class ServicesConfiguration
         var storageOptions = new FileStorageClientOptions
         {
             BaseUrl = storageSection["BaseUrl"] ?? throw new InvalidOperationException("FileStorageService:BaseUrl is not configured."),
+            UseInternalUrls = !bool.TryParse(storageSection["UseInternalUrls"], out var useInternalUrls) || useInternalUrls,
         };
 
         services.AddSingleton(storageOptions);

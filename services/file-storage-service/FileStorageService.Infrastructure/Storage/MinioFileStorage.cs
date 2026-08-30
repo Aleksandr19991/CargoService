@@ -8,7 +8,10 @@ namespace FileStorageService.Infrastructure.Storage;
 
 public class MinioFileStorage(MinioClients clients, MinioOptions options, FileUploadPolicy uploadPolicy) : IFileStorage
 {
-    public async Task<FileUploadTicket> CreateUploadTicketAsync(string contentType, CancellationToken cancellationToken = default)
+    public async Task<FileUploadTicket> CreateUploadTicketAsync(
+        string contentType,
+        bool forInternalNetwork = false,
+        CancellationToken cancellationToken = default)
     {
         var fileId = Guid.NewGuid();
         var expiresAt = DateTimeOffset.UtcNow.Add(options.UrlLifetime);
@@ -26,7 +29,11 @@ public class MinioFileStorage(MinioClients clients, MinioOptions options, FileUp
         policy.SetContentType(contentType);
         policy.SetContentRange(1, uploadPolicy.MaxFileSizeBytes);
 
-        var (uri, formFields) = await clients.Presigning.PresignedPostPolicyAsync(policy);
+        // Тот же выбор адреса, что и при скачивании: сервис, который льёт файл сам изнутри
+        // docker-сети (document-service кладёт сюда PDF), до публичного localhost не достучится.
+        var signingClient = forInternalNetwork ? clients.Operations : clients.Presigning;
+
+        var (uri, formFields) = await signingClient.PresignedPostPolicyAsync(policy);
 
         // SDK возвращает подпись и служебные поля, но само поле Content-Type в форму не кладёт,
         // хотя условие `eq $Content-Type` в политику записывает. Клиент, отправивший ровно то,

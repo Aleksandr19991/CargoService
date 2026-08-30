@@ -313,6 +313,10 @@ services:
       Keycloak__BaseUrl: http://keycloak:8080
       KeycloakServiceAccount__BaseUrl: http://keycloak:8080
       FileStorageService__BaseUrl: http://filestorage:8080
+      # appsettings.Development.json выключает внутренние ссылки ради запуска на хосте, а в
+      # docker-сети они, наоборот, единственно рабочие: публичный localhost ведёт из контейнера
+      # в него самого, а хост входит в подпись SigV4 — переписать его в готовой ссылке нельзя.
+      FileStorageService__UseInternalUrls: "true"
       RabbitMQ__HostName: rabbitmq
       Seq__ServerUrl: http://seq:80
     ports:
@@ -329,8 +333,38 @@ services:
       seq:
         condition: service_started
 
+  documentservice:
+    build:
+      context: .
+      dockerfile: services/document-service/Dockerfile
+    container_name: documentservice-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=documentservice;Username=documentservice;Password=documentservice
+      Keycloak__BaseUrl: http://keycloak:8080
+      KeycloakServiceAccount__BaseUrl: http://keycloak:8080
+      FileStorageService__BaseUrl: http://filestorage:8080
+      # См. пояснение у ai-inspection-service: в docker-сети ссылки хранилища должны быть
+      # внутренними, а appsettings.Development.json выключает их ради запуска на хосте.
+      FileStorageService__UseInternalUrls: "true"
+      RabbitMQ__HostName: rabbitmq
+      Seq__ServerUrl: http://seq:80
+    ports:
+      - "8089:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      filestorage:
+        condition: service_started
+      seq:
+        condition: service_started
+
   # Остальные сервисы добавляются сюда по мере реализации их Dockerfile-ов
-  # (см. spec.md, Фазы 8-10), а также api-gateway — по мере реализации Фазы 12.
+  # (см. spec.md, Фазы 9-10), а также api-gateway — по мере реализации Фазы 12.
 
 volumes:
   postgres_data:

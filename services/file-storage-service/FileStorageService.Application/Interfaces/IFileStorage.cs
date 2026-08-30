@@ -13,7 +13,15 @@ public interface IFileStorage
     /// размеру входят в подпись, поэтому их проверяет само хранилище — сервис не может быть
     /// обойдён клиентом, который решит отправить файл побольше.
     /// </summary>
-    Task<FileUploadTicket> CreateUploadTicketAsync(string contentType, CancellationToken cancellationToken = default);
+    /// <param name="forInternalNetwork">
+    /// Подписать разрешение на внутренний адрес хранилища — для сервисов, которые льют файл
+    /// сами изнутри docker-сети. Публичный адрес это <c>localhost</c> браузера пользователя, и
+    /// из контейнера он ведёт в сам контейнер; переписать хост в готовой подписи нельзя.
+    /// </param>
+    Task<FileUploadTicket> CreateUploadTicketAsync(
+        string contentType,
+        bool forInternalNetwork = false,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Presigned GET-ссылка на существующий файл. <c>null</c>, если файла с таким id в хранилище нет —

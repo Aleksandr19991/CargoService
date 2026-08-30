@@ -21,13 +21,19 @@ namespace DocumentService.Infrastructure.FileStorage;
 /// хранилище отвергает.
 /// </para>
 /// </summary>
-public class FileStorageClient(HttpClient httpClient, ServiceTokenProvider tokenProvider) : IFileStorageClient
+public class FileStorageClient(
+    HttpClient httpClient,
+    FileStorageClientOptions options,
+    ServiceTokenProvider tokenProvider) : IFileStorageClient
 {
     public async Task<Guid> UploadAsync(byte[] content, string contentType, CancellationToken cancellationToken)
     {
         var token = await tokenProvider.GetAccessTokenAsync(cancellationToken);
 
-        using var ticketRequest = new HttpRequestMessage(HttpMethod.Post, "api/files/upload-url")
+        // Разрешение просится подписанным на внутренний адрес хранилища: файл льёт сам сервис
+        // изнутри docker-сети, а публичный адрес — это localhost браузера пользователя.
+        var internalUrls = options.UseInternalUrls.ToString().ToLowerInvariant();
+        using var ticketRequest = new HttpRequestMessage(HttpMethod.Post, $"api/files/upload-url?internal={internalUrls}")
         {
             Content = JsonContent.Create(new { contentType }),
         };

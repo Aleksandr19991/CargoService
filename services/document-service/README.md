@@ -89,6 +89,13 @@ dotnet build DocumentService.slnx
 dotnet run --project DocumentService
 ```
 
+Тесты:
+
+```
+dotnet test DocumentService.Application.Tests   # без внешних зависимостей
+dotnet test DocumentService.IntegrationTests    # нужен запущенный Docker-демон (Testcontainers)
+```
+
 Миграции (из `DocumentService.Persistence/`):
 
 ```
