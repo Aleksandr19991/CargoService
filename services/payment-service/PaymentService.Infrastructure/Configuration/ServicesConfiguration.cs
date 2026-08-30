@@ -1,6 +1,10 @@
+using CargoService.Contracts.Events.V1;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PaymentService.Application.Interfaces;
+using PaymentService.Application.Models;
+using PaymentService.Infrastructure.Messaging;
 using PaymentService.Infrastructure.Payments;
 using Polly;
 using Polly.Extensions.Http;
@@ -10,14 +14,46 @@ namespace PaymentService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Дальше сюда добавятся консьюмеры `OrderConfirmed`/`OrderCancelled` и outbox для
-    // `PaymentCompleted`/`PaymentFailed`/`RefundIssued` — следующие задачи Фазы 9 (spec.md).
+    // Дальше сюда добавится outbox для `PaymentCompleted`/`PaymentFailed`/`RefundIssued` —
+    // следующие задачи Фазы 9 (spec.md).
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         AddPaymentProvider(services, configuration);
+        AddEventConsumers(services, configuration);
 
         return services;
     }
+
+    /// <summary>
+    /// Подписки сервиса из таблицы событий spec.md §4. <c>OrderCancelled</c> (возвраты)
+    /// добавится в задаче 5 Фазы 9.
+    /// </summary>
+    private static void AddEventConsumers(IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(RabbitMqOptions.SectionName);
+        services.AddSingleton(new RabbitMqOptions
+        {
+            HostName = section["HostName"] ?? throw new InvalidOperationException("RabbitMQ:HostName is not configured."),
+            Port = int.Parse(section["Port"] ?? throw new InvalidOperationException("RabbitMQ:Port is not configured.")),
+            UserName = section["UserName"] ?? throw new InvalidOperationException("RabbitMQ:UserName is not configured."),
+            Password = section["Password"] ?? throw new InvalidOperationException("RabbitMQ:Password is not configured."),
+        });
+
+        services.AddEventConsumer<OrderConfirmed>("orders-service");
+    }
+
+    /// <summary>
+    /// Сервис-издатель задаётся строкой, потому что он часть routing key чужого события, а не
+    /// свойство типа: тот же контракт может публиковать другой сервис, и знать об этом должен
+    /// подписчик.
+    /// </summary>
+    private static void AddEventConsumer<TEvent>(this IServiceCollection services, string publishingService)
+        where TEvent : IntegrationEvent =>
+        services.AddHostedService(provider => new EventConsumer<TEvent>(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            provider.GetRequiredService<RabbitMqOptions>(),
+            publishingService,
+            provider.GetRequiredService<ILogger<EventConsumer<TEvent>>>()));
 
     /// <summary>
     /// Боевой клиент подключается, только когда в конфигурации есть учётные данные магазина;
@@ -38,6 +74,10 @@ public static class ServicesConfiguration
         };
 
         services.AddSingleton(options);
+
+        // Валюта нужна сценариям Application (в счёте), но собственного ключа у неё нет — иначе
+        // два ключа разъехались бы, и счёт выставлялся бы в одной валюте, а платёж заводился в другой.
+        services.AddSingleton(new PaymentOptions { Currency = options.Currency });
 
         var isProviderConfigured = !string.IsNullOrWhiteSpace(options.ShopId)
             && !string.IsNullOrWhiteSpace(options.SecretKey);

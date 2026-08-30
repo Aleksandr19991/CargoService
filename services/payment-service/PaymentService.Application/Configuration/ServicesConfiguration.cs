@@ -1,12 +1,18 @@
+using CargoService.Contracts.Events.V1;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentService.Application.EventHandlers;
+using PaymentService.Application.Interfaces;
 
 namespace PaymentService.Application.Configuration;
 
 public static class ServicesConfiguration
 {
-    // No Application services yet — сервисы сценариев (выставление счёта по заявке, проведение
-    // оплаты, возврат при отмене) появятся в следующих задачах Фазы 9.
     public static void AddApplicationServices(this IServiceCollection services)
     {
+        services.AddScoped<IInvoicesService, InvoicesService>();
+
+        // По обработчику на событие; обобщённый консьюмер в Infrastructure находит нужный по
+        // типу события. `OrderCancelled` добавится в задаче 5 Фазы 9.
+        services.AddScoped<IEventHandler<OrderConfirmed>, OrderConfirmedHandler>();
     }
 }

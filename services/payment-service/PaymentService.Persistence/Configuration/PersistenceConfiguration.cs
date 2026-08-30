@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentService.Application.Interfaces;
+using PaymentService.Persistence.Inbox;
+using PaymentService.Persistence.Repositories;
 
 namespace PaymentService.Persistence.Configuration;
 
@@ -9,6 +12,9 @@ public static class PersistenceConfiguration
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.EnableRetryOnFailure()));
+
+        services.AddScoped<IInvoicesRepository, InvoicesRepository>();
+        services.AddScoped<IInboxRepository, InboxRepository>();
 
         return services;
     }
