@@ -16,8 +16,11 @@ namespace FileStorageService.API.Controllers;
 [Authorize]
 public class FilesController(IFileStorage fileStorage) : ControllerBase
 {
-    // Файлы в системе заводят сотрудники: фото приёмки делает склад, сканы документов — бэк-офис.
-    private const string UploadRoles = "WarehouseOperator,Manager,Admin";
+    // Файлы в системе заводят сотрудники (фото приёмки — склад, сканы — бэк-офис) и сервисы:
+    // document-service кладёт сюда сформированные PDF. Для сервисных учётных записей заведена
+    // отдельная роль FileWriter, а не выдана роль склада: сервис не сотрудник, и путать их
+    // в правах значит однажды дать сервису лишнего вместе с расширением роли склада.
+    private const string UploadRoles = "WarehouseOperator,Manager,Admin,FileWriter";
 
     [HttpPost("upload-url")]
     [Authorize(Roles = UploadRoles)]

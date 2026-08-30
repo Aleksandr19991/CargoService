@@ -1,10 +1,16 @@
 using CargoService.Contracts.Events.V1;
 using DocumentService.Application.Interfaces;
+using DocumentService.Infrastructure.FileStorage;
+using DocumentService.Infrastructure.Keycloak;
 using DocumentService.Infrastructure.Messaging;
+using DocumentService.Infrastructure.Outbox;
 using DocumentService.Infrastructure.Pdf;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Extensions.Http;
+using Polly.Timeout;
 using QuestPDF;
 using QuestPDF.Infrastructure;
 
@@ -12,16 +18,71 @@ namespace DocumentService.Infrastructure.Configuration;
 
 public static class ServicesConfiguration
 {
-    // Здесь появятся клиент file-storage-service и outbox для `DocumentGenerated` — следующая
-    // задача Фазы 8.
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         AddTrackingCodes(services, configuration);
         AddPdfRenderer(services);
+        AddFileStorageClient(services, configuration);
         AddEventConsumers(services, configuration);
+
+        services.AddHostedService<DocumentGenerationWorker>();
+        services.AddHostedService<OutboxDispatcher>();
 
         return services;
     }
+
+    private static void AddFileStorageClient(IServiceCollection services, IConfiguration configuration)
+    {
+        var keycloakSection = configuration.GetSection(KeycloakServiceAccountOptions.SectionName);
+        var accountOptions = new KeycloakServiceAccountOptions
+        {
+            BaseUrl = keycloakSection["BaseUrl"] ?? throw new InvalidOperationException("KeycloakServiceAccount:BaseUrl is not configured."),
+            Realm = keycloakSection["Realm"] ?? throw new InvalidOperationException("KeycloakServiceAccount:Realm is not configured."),
+            ClientId = keycloakSection["ClientId"] ?? throw new InvalidOperationException("KeycloakServiceAccount:ClientId is not configured."),
+            ClientSecret = keycloakSection["ClientSecret"] ?? throw new InvalidOperationException("KeycloakServiceAccount:ClientSecret is not configured."),
+        };
+
+        services.AddSingleton(accountOptions);
+
+        // Кэш токена общий на процесс — иначе смысл кэширования теряется.
+        services.AddHttpClient<ServiceTokenProvider>();
+
+        var storageSection = configuration.GetSection(FileStorageClientOptions.SectionName);
+        var storageOptions = new FileStorageClientOptions
+        {
+            BaseUrl = storageSection["BaseUrl"] ?? throw new InvalidOperationException("FileStorageService:BaseUrl is not configured."),
+        };
+
+        services.AddSingleton(storageOptions);
+
+        services.AddHttpClient<IFileStorageClient, FileStorageClient>(client =>
+            {
+                client.BaseAddress = new Uri(storageOptions.BaseUrl);
+                // Как и у остальных межсервисных клиентов: общий таймаут — предохранитель,
+                // отдельную попытку ограничивает политика ниже.
+                client.Timeout = TimeSpan.FromSeconds(60);
+            })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy())
+            .AddPolicyHandler(GetTimeoutPolicy());
+    }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .Or<TimeoutRejectedException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .Or<TimeoutRejectedException>()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+
+    // Загрузка файла — не мгновенная операция, поэтому лимит попытки больше, чем у обычных
+    // JSON-вызовов в других сервисах.
+    private static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
+        Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(30), TimeoutStrategy.Optimistic);
 
     /// <summary>
     /// Четыре подписки: события груза говорят, какие документы понадобились, события заявки

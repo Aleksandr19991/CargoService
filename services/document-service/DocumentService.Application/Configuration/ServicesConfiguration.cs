@@ -10,6 +10,7 @@ public static class ServicesConfiguration
     public static void AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IDocumentsService, DocumentsService>();
+        services.AddScoped<IDocumentGenerationProcessor, DocumentGenerationProcessor>();
 
         // По обработчику на событие; обобщённый консьюмер в Infrastructure находит нужный по
         // типу события.

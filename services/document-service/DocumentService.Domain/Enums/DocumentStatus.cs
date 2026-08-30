@@ -6,6 +6,9 @@ public enum DocumentStatus
     /// <summary>Событие получено, документ нужно сформировать.</summary>
     Pending,
 
+    /// <summary>Документ взят в работу фоновым рабочим — строка занята, повторно её брать нельзя.</summary>
+    Processing,
+
     /// <summary>PDF собран и сохранён в File Storage — идентификатор файла в <c>FileId</c>.</summary>
     Ready,
 

@@ -9,7 +9,8 @@
       { "name": "Manager", "description": "Менеджер back-office" },
       { "name": "WarehouseOperator", "description": "Приёмка/обработка груза на складе" },
       { "name": "Courier", "description": "Курьер (забор/доставка)" },
-      { "name": "Admin", "description": "Администратор системы" }
+      { "name": "Admin", "description": "Администратор системы" },
+      { "name": "FileWriter", "description": "Может заводить файлы в хранилище. Роль для сервисных учётных записей: файлы создают не только сотрудники — document-service кладёт туда сформированные PDF" }
     ]
   },
   "clients": [
@@ -23,6 +24,34 @@
       "secret": "identity-service-dev-secret",
       "serviceAccountsEnabled": true,
       "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "authorizationServicesEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "identity-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "document-service",
+      "name": "document-service (service account)",
+      "description": "Межсервисные вызовы document-service → file-storage-service (загрузка сформированных PDF). Только client_credentials; сервисной учётной записи выдана роль FileWriter.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "document-service-dev-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "authorizationServicesEnabled": false,
@@ -105,6 +134,12 @@
       "clientRoles": {
         "realm-management": ["manage-users", "view-realm"]
       }
+    },
+    {
+      "username": "service-account-document-service",
+      "enabled": true,
+      "serviceAccountClientId": "document-service",
+      "realmRoles": ["FileWriter"]
     },
     {
       "username": "admin@cargoservice.local",

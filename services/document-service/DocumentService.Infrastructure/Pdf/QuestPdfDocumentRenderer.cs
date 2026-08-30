@@ -50,21 +50,40 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             },
             ["Груз сдал (отправитель)", "Груз принял (перевозчик)"]);
 
-    public byte[] RenderAcceptanceAct(AcceptanceActModel model) =>
-        Render(
-            "Акт приёма-передачи груза",
+    public byte[] RenderAcceptanceAct(AcceptanceActModel model)
+    {
+        var isDelivery = model.Stage == HandoverStage.Delivery;
+
+        return Render(
+            isDelivery
+                ? "Акт приёма-передачи груза (выдача получателю)"
+                : "Акт приёма-передачи груза (приёмка на склад)",
             model.TrackingNumber,
-            model.AcceptedAt,
+            model.HandedOverAt,
             rows =>
             {
                 rows("Номер заявки", model.OrderNumber);
-                rows("Дата приёмки", DateTime(model.AcceptedAt));
-                rows("Состояние упаковки", model.PackagingCondition);
-                rows("Состояние груза", model.CargoCondition);
-                rows("Фотофиксация, снимков", model.PhotoCount.ToString(Culture));
-                rows("Груз принял", model.InspectedByName);
+                rows("Отправитель", model.SenderName);
+                rows("Получатель", model.RecipientName);
+                rows("Наименование груза", model.CargoName);
+                rows(isDelivery ? "Дата выдачи" : "Дата приёмки", DateTime(model.HandedOverAt));
+
+                if (isDelivery)
+                {
+                    rows("Груз получил", model.ReceivedByName);
+                }
+                else
+                {
+                    // Состояния печатаются только на приёмке: на выдаче их никто не фиксировал,
+                    // и перепечатывать сюда состояние двухнедельной давности было бы неправдой.
+                    rows("Состояние упаковки", model.PackagingCondition);
+                    rows("Состояние груза", model.CargoCondition);
+                }
             },
-            ["Груз сдал (отправитель)", "Груз принял (склад)"]);
+            isDelivery
+                ? ["Груз сдал (перевозчик)", "Груз принял (получатель)"]
+                : ["Груз сдал (отправитель)", "Груз принял (склад)"]);
+    }
 
     public byte[] RenderDamageInspectionAct(DamageInspectionActModel model) =>
         Render(
@@ -74,12 +93,13 @@ public class QuestPdfDocumentRenderer : IDocumentRenderer
             rows =>
             {
                 rows("Номер заявки", model.OrderNumber);
+                rows("Отправитель", model.SenderName);
+                rows("Получатель", model.RecipientName);
+                rows("Наименование груза", model.CargoName);
+                rows("Объявленная ценность, руб.", Money(model.DeclaredValue));
                 rows("Дата осмотра", DateTime(model.InspectedAt));
                 rows("Состояние упаковки", model.PackagingCondition);
                 rows("Состояние груза", model.CargoCondition);
-                rows("Фотофиксация, снимков", model.PhotoCount.ToString(Culture));
-                rows("Обстоятельства", model.Comment);
-                rows("Осмотр провёл", model.InspectedByName);
 
                 // Вердикт модели печатается как вспомогательное свидетельство и только если
                 // проверка была: строка «автоматическая проверка: —» в акте о повреждении

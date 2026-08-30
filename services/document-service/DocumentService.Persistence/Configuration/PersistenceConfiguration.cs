@@ -1,5 +1,6 @@
 using DocumentService.Application.Interfaces;
 using DocumentService.Persistence.Inbox;
+using DocumentService.Persistence.Outbox;
 using DocumentService.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,8 @@ public static class PersistenceConfiguration
         services.AddScoped<IDocumentsRepository, DocumentsRepository>();
         services.AddScoped<IOrderSnapshotsRepository, OrderSnapshotsRepository>();
         services.AddScoped<IInboxRepository, InboxRepository>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxReader, OutboxReader>();
 
         return services;
     }
