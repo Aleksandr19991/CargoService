@@ -21,6 +21,7 @@ public class OrderSnapshotsRepository(AppDbContext dbContext) : IOrderSnapshotsR
             snapshot.OrderId,
             stored =>
             {
+                stored.ClientAccountId = snapshot.ClientAccountId;
                 stored.OrderNumber = snapshot.OrderNumber;
                 stored.OriginCity = snapshot.OriginCity;
                 stored.DestinationCity = snapshot.DestinationCity;

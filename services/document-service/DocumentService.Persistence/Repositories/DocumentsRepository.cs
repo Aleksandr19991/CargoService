@@ -54,6 +54,25 @@ public class DocumentsRepository(AppDbContext dbContext) : IDocumentsRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<Document?> GetByIdAsync(Guid documentId, CancellationToken cancellationToken) =>
+        dbContext.Documents
+            .AsNoTracking()
+            .FirstOrDefaultAsync(document => document.Id == documentId, cancellationToken);
+
+    public async Task<IReadOnlyList<Document>> GetByOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await dbContext.Documents
+            .AsNoTracking()
+            .Where(document => document.OrderId == orderId)
+            .OrderByDescending(document => document.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Document>> GetByShipmentAsync(Guid shipmentId, CancellationToken cancellationToken) =>
+        await dbContext.Documents
+            .AsNoTracking()
+            .Where(document => document.ShipmentId == shipmentId)
+            .OrderByDescending(document => document.CreatedAt)
+            .ToListAsync(cancellationToken);
+
     public async Task MarkFailedAsync(Guid documentId, string reason, CancellationToken cancellationToken)
     {
         var document = await dbContext.Documents.FirstAsync(stored => stored.Id == documentId, cancellationToken);

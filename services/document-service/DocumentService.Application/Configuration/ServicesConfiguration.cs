@@ -11,6 +11,7 @@ public static class ServicesConfiguration
     {
         services.AddScoped<IDocumentsService, DocumentsService>();
         services.AddScoped<IDocumentGenerationProcessor, DocumentGenerationProcessor>();
+        services.AddScoped<IDocumentsQueryService, DocumentsQueryService>();
 
         // По обработчику на событие; обобщённый консьюмер в Infrastructure находит нужный по
         // типу события.

@@ -14,6 +14,13 @@ public class OrderSnapshot
 {
     public Guid OrderId { get; set; }
 
+    /// <summary>
+    /// Владелец заявки (в orders-service это идентификатор пользователя из токена). Хранится
+    /// затем, чтобы клиент видел документы только по своим заявкам: сам сервис о правах на
+    /// заявку иначе ничего не знает.
+    /// </summary>
+    public Guid ClientAccountId { get; set; }
+
     public string OrderNumber { get; set; } = string.Empty;
     public string OriginCity { get; set; } = string.Empty;
     public string DestinationCity { get; set; } = string.Empty;

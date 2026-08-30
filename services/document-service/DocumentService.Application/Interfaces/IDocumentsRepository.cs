@@ -18,4 +18,11 @@ public interface IDocumentsRepository
     Task MarkReadyAsync(Guid documentId, Guid fileId, CancellationToken cancellationToken);
 
     Task MarkFailedAsync(Guid documentId, string reason, CancellationToken cancellationToken);
+
+    Task<Document?> GetByIdAsync(Guid documentId, CancellationToken cancellationToken);
+
+    /// <summary>Документы по заявке или по грузу, свежие первыми.</summary>
+    Task<IReadOnlyList<Document>> GetByOrderAsync(Guid orderId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Document>> GetByShipmentAsync(Guid shipmentId, CancellationToken cancellationToken);
 }

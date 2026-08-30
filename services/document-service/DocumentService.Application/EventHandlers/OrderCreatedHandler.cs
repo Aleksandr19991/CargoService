@@ -16,6 +16,7 @@ public class OrderCreatedHandler(IOrderSnapshotsRepository snapshots) : IEventHa
             new OrderSnapshot
             {
                 OrderId = @event.OrderId,
+                ClientAccountId = @event.ClientAccountId,
                 OrderNumber = @event.OrderNumber,
                 OriginCity = @event.OriginCity,
                 DestinationCity = @event.DestinationCity,

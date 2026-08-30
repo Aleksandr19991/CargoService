@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -60,6 +61,35 @@ public class FileStorageClient(HttpClient httpClient, ServiceTokenProvider token
         uploadResponse.EnsureSuccessStatusCode();
 
         return ticket.FileId;
+    }
+
+    public async Task<DocumentDownloadLink?> CreateDownloadLinkAsync(Guid fileId, CancellationToken cancellationToken)
+    {
+        var token = await tokenProvider.GetAccessTokenAsync(cancellationToken);
+
+        // Ссылка запрашивается публичная (без ?internal=true): её отдают в браузер клиента, а
+        // подпись SigV4 включает хост — внутренний адрес снаружи не откроется.
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/files/{fileId}/download-url");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+
+        var ticket = await response.Content.ReadFromJsonAsync<DownloadUrlResponse>(cancellationToken)
+            ?? throw new InvalidOperationException($"Empty download ticket for file {fileId}.");
+
+        return new DocumentDownloadLink(ticket.DownloadUrl, ticket.ExpiresAt);
+    }
+
+    private sealed record DownloadUrlResponse
+    {
+        public required Guid FileId { get; init; }
+        public required string DownloadUrl { get; init; }
+        public required DateTimeOffset ExpiresAt { get; init; }
     }
 
     private sealed record UploadUrlResponse
