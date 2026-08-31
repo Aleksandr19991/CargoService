@@ -116,3 +116,19 @@ dotnet run --project PaymentService
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```
+
+Тесты:
+
+```
+dotnet test PaymentService.Application.Tests
+dotnet test PaymentService.IntegrationTests
+```
+
+`PaymentService.Application.Tests` — xUnit + Moq, без внешних зависимостей: провайдер везде мок.
+`PaymentService.IntegrationTests` — xUnit + `Mvc.Testing` + Testcontainers, нужен запущенный
+Docker-демон; RabbitMQ и провайдер не поднимаются (все `IHostedService` сняты, клиент провайдера
+заменён управляемой заглушкой), а учётные данные магазина в настройках заданы намеренно — именно
+они включают перепроверку webhook, то есть боевое поведение.
+
+В общем стеке сервис поднимается вместе с остальными (`docker compose up --build` из корня
+репозитория) на порту **8090**.

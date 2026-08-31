@@ -28,3 +28,7 @@ app.UseHttpsRedirection();
 app.MapControllers();
 
 app.Run();
+
+// Makes the top-level-statement-generated Program class visible to
+// WebApplicationFactory<Program> in PaymentService.IntegrationTests.
+public partial class Program;

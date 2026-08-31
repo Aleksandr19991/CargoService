@@ -363,8 +363,35 @@ services:
       seq:
         condition: service_started
 
+  paymentservice:
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    container_name: paymentservice-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=paymentservice;Username=paymentservice;Password=paymentservice
+      RabbitMQ__HostName: rabbitmq
+      Seq__ServerUrl: http://seq:80
+      # Учётных данных магазина здесь нет намеренно: без них сервис работает на песочнице
+      # (см. README сервиса) — настоящий эквайринг в локальный стек не подключается.
+      # Адрес возврата плательщика — на опубликованный порт этого же сервиса.
+      PaymentProvider__ReturnUrl: http://localhost:8090/api/payments/return
+    ports:
+      - "8090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      seq:
+        condition: service_started
+
+  # Keycloak в зависимостях нет: своего API для людей у сервиса пока нет, а единственный
+  # эндпоинт (webhook провайдера) анонимный по необходимости.
+
   # Остальные сервисы добавляются сюда по мере реализации их Dockerfile-ов
-  # (см. spec.md, Фазы 9-10), а также api-gateway — по мере реализации Фазы 12.
+  # (см. spec.md, Фаза 10), а также api-gateway — по мере реализации Фазы 12.
 
 volumes:
   postgres_data:
