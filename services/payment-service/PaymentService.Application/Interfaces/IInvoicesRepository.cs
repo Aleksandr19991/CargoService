@@ -29,9 +29,20 @@ public interface IInvoicesRepository
 
     /// <summary>
     /// Отмечает платёж успешным и счёт оплаченным — одной транзакцией: платёж без оплаченного
-    /// счёта (и наоборот) означал бы расхождение в деньгах.
+    /// счёта (и наоборот) означал бы расхождение в деньгах. Счёт по отменённой заявке
+    /// оплаченным не становится — деньги пришли, но обязательства уже нет, и их возвращают.
     /// </summary>
     Task MarkPaymentSucceededAsync(Guid paymentId, CancellationToken cancellationToken);
 
     Task MarkPaymentFailedAsync(Guid paymentId, string reason, CancellationToken cancellationToken);
+
+    /// <summary>Закрывает неоплаченный счёт по отменённой заявке.</summary>
+    Task MarkInvoiceCancelledAsync(Guid invoiceId, CancellationToken cancellationToken);
+
+    Task AddRefundAsync(Refund refund, CancellationToken cancellationToken);
+
+    /// <summary>Отмечает возврат состоявшимся и переводит счёт в <c>Refunded</c> — одной транзакцией.</summary>
+    Task MarkRefundSucceededAsync(Guid refundId, string providerRefundId, CancellationToken cancellationToken);
+
+    Task MarkRefundFailedAsync(Guid refundId, string reason, CancellationToken cancellationToken);
 }

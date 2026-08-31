@@ -26,10 +26,7 @@ public static class ServicesConfiguration
         return services;
     }
 
-    /// <summary>
-    /// Подписки сервиса из таблицы событий spec.md §4. <c>OrderCancelled</c> (возвраты)
-    /// добавится в задаче 5 Фазы 9.
-    /// </summary>
+    /// <summary>Подписки сервиса из таблицы событий spec.md §4.</summary>
     private static void AddEventConsumers(IServiceCollection services, IConfiguration configuration)
     {
         var section = configuration.GetSection(RabbitMqOptions.SectionName);
@@ -42,6 +39,7 @@ public static class ServicesConfiguration
         });
 
         services.AddEventConsumer<OrderConfirmed>("orders-service");
+        services.AddEventConsumer<OrderCancelled>("orders-service");
     }
 
     /// <summary>

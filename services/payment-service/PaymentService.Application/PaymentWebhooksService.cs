@@ -16,6 +16,7 @@ namespace PaymentService.Application;
 public class PaymentWebhooksService(
     IInvoicesRepository invoices,
     IPaymentProviderClient paymentProvider,
+    IRefundsService refunds,
     IOutboxWriter outboxWriter,
     PaymentOptions options,
     ILogger<PaymentWebhooksService> logger) : IPaymentWebhooksService
@@ -106,6 +107,9 @@ public class PaymentWebhooksService(
         Payment payment,
         CancellationToken cancellationToken)
     {
+        if (invoice.Status == InvoiceStatus.Cancelled)
+            return await RefundLatePaymentAsync(invoice, payment, cancellationToken);
+
         var completed = new PaymentCompleted
         {
             OrderId = invoice.OrderId,
@@ -126,6 +130,36 @@ public class PaymentWebhooksService(
         logger.LogInformation(
             "Payment {PaymentId} for order {OrderNumber} succeeded, invoice {InvoiceId} is paid",
             payment.Id, invoice.OrderNumber, invoice.Id);
+
+        return WebhookOutcome.Applied;
+    }
+
+    /// <summary>
+    /// Оплата пришла уже после отмены заявки: платёжная ссылка живёт на стороне провайдера, и
+    /// отмена заявки клиента по ней заплатить не мешает. Деньги записываются полученными и тут
+    /// же уезжают на возврат.
+    /// <para>
+    /// <c>PaymentCompleted</c> при этом не публикуется: заявка отменена, и сказать о ней
+    /// «оплачена» значило бы попросить orders-service оживить отменённый заказ. Наружу уходит
+    /// только <c>RefundIssued</c> — то, что с деньгами в итоге и произошло.
+    /// </para>
+    /// </summary>
+    private async Task<WebhookOutcome> RefundLatePaymentAsync(
+        Invoice invoice,
+        Payment payment,
+        CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Payment {PaymentId} succeeded after order {OrderNumber} was cancelled; refunding",
+            payment.Id, invoice.OrderNumber);
+
+        await invoices.MarkPaymentSucceededAsync(payment.Id, cancellationToken);
+
+        await refunds.RefundPaymentAsync(
+            invoice,
+            payment,
+            $"Оплата поступила после отмены заявки {invoice.OrderNumber}",
+            cancellationToken);
 
         return WebhookOutcome.Applied;
     }

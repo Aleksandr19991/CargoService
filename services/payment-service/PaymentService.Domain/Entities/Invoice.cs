@@ -31,4 +31,6 @@ public class Invoice
     public DateTimeOffset? PaidAt { get; set; }
 
     public ICollection<Payment> Payments { get; set; } = [];
+
+    public ICollection<Refund> Refunds { get; set; } = [];
 }

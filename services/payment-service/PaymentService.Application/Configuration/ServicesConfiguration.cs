@@ -11,9 +11,11 @@ public static class ServicesConfiguration
     {
         services.AddScoped<IInvoicesService, InvoicesService>();
         services.AddScoped<IPaymentWebhooksService, PaymentWebhooksService>();
+        services.AddScoped<IRefundsService, RefundsService>();
 
         // По обработчику на событие; обобщённый консьюмер в Infrastructure находит нужный по
-        // типу события. `OrderCancelled` добавится в задаче 5 Фазы 9.
+        // типу события.
         services.AddScoped<IEventHandler<OrderConfirmed>, OrderConfirmedHandler>();
+        services.AddScoped<IEventHandler<OrderCancelled>, OrderCancelledHandler>();
     }
 }

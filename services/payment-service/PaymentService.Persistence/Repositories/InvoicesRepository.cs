@@ -53,8 +53,13 @@ public class InvoicesRepository(AppDbContext dbContext) : IInvoicesRepository
         payment.Status = PaymentStatus.Succeeded;
         payment.CompletedAt = now;
 
-        invoice.Status = InvoiceStatus.Paid;
-        invoice.PaidAt = now;
+        // Счёт по отменённой заявке в Paid не переводится: деньги пришли, но платить было уже не
+        // за что — такой платёж уезжает на возврат, и статус счёта сменится на Refunded.
+        if (invoice.Status == InvoiceStatus.Issued)
+        {
+            invoice.Status = InvoiceStatus.Paid;
+            invoice.PaidAt = now;
+        }
 
         // SaveChanges здесь один на всё: событие в outbox поставлено вызывающим кодом на этом же
         // DbContext, поэтому платёж, счёт и событие коммитятся одной транзакцией.
@@ -68,6 +73,51 @@ public class InvoicesRepository(AppDbContext dbContext) : IInvoicesRepository
         payment.Status = PaymentStatus.Failed;
         payment.FailureReason = reason;
         payment.CompletedAt = DateTimeOffset.UtcNow;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkInvoiceCancelledAsync(Guid invoiceId, CancellationToken cancellationToken)
+    {
+        var invoice = await dbContext.Invoices.FirstAsync(stored => stored.Id == invoiceId, cancellationToken);
+
+        invoice.Status = InvoiceStatus.Cancelled;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddRefundAsync(Refund refund, CancellationToken cancellationToken)
+    {
+        await dbContext.Refunds.AddAsync(refund, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkRefundSucceededAsync(
+        Guid refundId,
+        string providerRefundId,
+        CancellationToken cancellationToken)
+    {
+        var refund = await dbContext.Refunds.FirstAsync(stored => stored.Id == refundId, cancellationToken);
+        var invoice = await dbContext.Invoices.FirstAsync(stored => stored.Id == refund.InvoiceId, cancellationToken);
+
+        refund.Status = RefundStatus.Succeeded;
+        refund.ProviderRefundId = providerRefundId;
+        refund.CompletedAt = DateTimeOffset.UtcNow;
+
+        invoice.Status = InvoiceStatus.Refunded;
+
+        // SaveChanges здесь один на всё: RefundIssued поставлен в outbox вызывающим кодом на этом
+        // же DbContext — возврат, статус счёта и событие коммитятся одной транзакцией.
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MarkRefundFailedAsync(Guid refundId, string reason, CancellationToken cancellationToken)
+    {
+        var refund = await dbContext.Refunds.FirstAsync(stored => stored.Id == refundId, cancellationToken);
+
+        refund.Status = RefundStatus.Failed;
+        refund.FailureReason = reason;
+        refund.CompletedAt = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

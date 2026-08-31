@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<Payment> Payments => Set<Payment>();
 
+    public DbSet<Refund> Refunds => Set<Refund>();
+
     // Отметки об обработанных событиях — дедупликация повторных доставок.
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
