@@ -4,109 +4,190 @@
 
 ## Обзор проекта
 
-Платформа грузоперевозок, разрабатываемая как **монорепозиторий микросервисов на .NET 10 / C#** (PostgreSQL на каждый сервис, RabbitMQ для межсервисных событий через транзакционный outbox, Serilog → Seq для централизованного логирования). Полная целевая архитектура, список микросервисов, их сущности/API/события и бэклог разработки (по фазам) описаны в [spec.md](spec.md) — читайте его перед планированием кросс-сервисной работы или добавлением нового микросервиса, и держите его чек-лист Фазы 0 в [spec.md](spec.md) актуальным по мере выполнения задач по инфраструктуре репозитория.
+Платформа грузоперевозок — **монорепозиторий микросервисов на .NET 10 / C#**: PostgreSQL на каждый сервис, RabbitMQ для межсервисных событий (транзакционный outbox у издателей, inbox-дедупликация у части потребителей), Keycloak как провайдер идентификации, Serilog → Seq для централизованного логирования.
 
-Реальный код сегодня есть только у **identity-service**; каждый остальной сервис под `services/` — это папка-заглушка с `README.md`, указывающим на соответствующий раздел `spec.md`.
+Полная целевая архитектура, сущности/API/события каждого сервиса и бэклог по фазам — в [spec.md](spec.md); это источник истины о том, что строить дальше. Читайте его перед планированием кросс-сервисной работы и держите его чек-листы актуальными по мере выполнения задач.
+
+Реализованы **все десять сервисов** под `services/` (фазы 0–9 и 11 бэклога). Не сделаны: Logistics Service (Фаза 10), API Gateway (Фаза 12), наблюдаемость/DevOps — health checks, метрики, трассировка, CI (Фаза 13), сквозные end-to-end тесты (Фаза 14).
 
 ## Структура репозитория
 
 ```
-services/{service-name}/     один микросервис на папку (полный список — spec.md §2)
-shared/CargoService.Contracts/   общая библиотека DTO событий RabbitMQ v1 (Events/V1/) и конвенций топологии (Messaging/RabbitMqConventions.cs)
-spec.md                      архитектурная спецификация + бэклог по фазам — источник истины о том, что строить дальше
-Directory.Build.props        общие MSBuild-свойства (TargetFramework, Nullable, ImplicitUsings, LangVersion) для всех проектов репозитория
-Directory.Packages.props     централизованное управление пакетами — версии пакетов закреплены здесь; csproj-файлы ссылаются на пакеты без атрибута Version
-.editorconfig                общие правила стиля/форматирования/именования C# для всех сервисов
+services/{service-name}/         один микросервис на папку
+shared/CargoService.Contracts/   общая библиотека DTO событий (Events/V1/) и конвенций топологии RabbitMQ (Messaging/RabbitMqConventions.cs)
+docker/init-db.sql               создание БД и пользователей Postgres под каждый сервис (по одной БД на сервис)
+docker/keycloak/realm-export.json  realm как код: роли, клиенты, засеянный админ
+spec.md                          архитектурная спецификация + бэклог по фазам
+README.md                        описание проекта для GitHub: схема событий, порты, быстрый старт
+Directory.Build.props            общие MSBuild-свойства (TargetFramework, Nullable, ImplicitUsings, LangVersion)
+Directory.Packages.props         централизованное управление версиями пакетов; csproj ссылаются на пакеты без атрибута Version
+.editorconfig                    общие правила стиля/форматирования/именования C#
 ```
 
-Каждый микросервис построен по Clean Architecture с одним проектом на слой, названным `{ServiceName}.{Layer}`:
-- `{ServiceName}.Domain` — только сущности, без зависимостей.
-- `{ServiceName}.Application` — сервисы сценариев использования + интерфейсы (например, `IUsersService`, `IUsersRepository`), зависит от Domain.
-- `{ServiceName}.Persistence` — EF Core `DbContext`, классы `IEntityTypeConfiguration<T>` (автоматически обнаруживаются через `ApplyConfigurationsFromAssembly`), реализации репозиториев, EF-миграции. Зависит от Application + Domain.
-- `{ServiceName}` (без суффикса) — проект хоста/контроллеров ASP.NET Core Web API. Зависит от Application + Persistence.
+Репозиторного решения на весь монорепо нет — у каждого сервиса свой `{ServiceName}.slnx` внутри его папки.
 
-Связывание между слоями выполняется через extension-методы `IServiceCollection` (и, в API-проекте, `WebApplicationBuilder`/`WebApplication`), а не инлайном в `Program.cs` — `Program.cs` должен оставаться коротким манифестом вызовов, вся логика уходит в extension-методы под `Configuration/` каждого проекта:
-- `AddApplicationServices()` (в `{ServiceName}.Application/Configuration/ServicesConfiguration.cs`) регистрирует сервисы слоя Application.
-- `AddPersistence(connectionString)` (в `{ServiceName}.Persistence/Configuration/PersistenceConfiguration.cs`) регистрирует `DbContext` (Npgsql) и репозитории.
-- В самом API-проекте (`{ServiceName}/Configuration/`) — свои extension-методы на `WebApplicationBuilder`/`IServiceCollection`/`WebApplication` под каждую заботу (логирование, аутентификация, регистрация контроллеров/валидации/маппинга, миграция БД при старте, dev-only эндпоинты). См. identity-service ниже как образец для новых сервисов.
+Соответствие имён (легаси общего названия платформы): папка `services/cargo-service/` — это **cargo-service** (грузы, `CargoService.*`, БД `cargoshipments`, compose-сервис `cargoshipments`, порт 8085), а compose-сервис `cargoservice` с БД `cargoservice` — это **identity-service** (порт 8081). При правках `docker-compose.yml`/`init-db.sql` легко перепутать.
 
-`Program.cs` вызывает эти extension-методы, затем при старте мигрирует БД перед маппингом контроллеров — миграции применяются автоматически при запуске API, отдельного шага миграции в обычном dev/docker-процессе нет.
+## Общие конвенции всех сервисов
 
-Логирование через Serilog, подключается extension-методом на `WebApplicationBuilder` (`AddSerilogLogging()` в `Configuration/LoggingConfiguration.cs` identity-service — не через стандартную секцию конфигурации `Logging`, appsettings используют секцию `Serilog`/`MinimumLevel`). Логи всегда пишутся в консоль; дополнительно пишутся в Seq, если задан `Seq:ServerUrl` (`http://localhost:5341` в `appsettings.Development.json` для локальных запусков, переопределяется на `http://seq:80` через переменную окружения `Seq__ServerUrl` в `docker-compose.yml` для контейнерной сети). Новые сервисы должны копировать этот же блок `UseSerilog` и конвенцию конфигурации `Seq:ServerUrl`, а не изобретать собственную настройку логирования.
+Все сервисы построены по одному шаблону. Отклонения от него перечислены в разделе «Сервисы» ниже; во всём остальном новый код должен повторять этот шаблон, а не изобретать свой.
 
-## identity-service
+### Слои и проекты
 
-Путь: `services/identity-service/`. Файл решения: `IdentityService.slnx` (лежит внутри папки сервиса, а не в корне репозитория — репозиторного решения на весь монорепо пока не существует).
+Clean Architecture, один проект на слой:
 
-Проекты: `IdentityService.Domain`, `IdentityService.Application`, `IdentityService.Infrastructure`, `IdentityService.Persistence`, `IdentityService` (API/хост). Текущий охват: CRUD над одной сущностью `User` (регистрация/обновление/удаление/получение по id/получение всех) через `UsersController` на `api/users`. У `User` нет поля пароля — учётные данные целиком живут в Keycloak (см. ниже).
+- `{ServiceName}.Domain` — только сущности и enum-ы, без зависимостей.
+- `{ServiceName}.Application` — сервисы сценариев использования, интерфейсы портов (`I...Repository`, `I...Client`, `IOutboxWriter`, `IEventHandler<T>`), модели/DTO слоя Application. Зависит от Domain и от `CargoService.Contracts`.
+- `{ServiceName}.Persistence` — EF Core `DbContext`, `IEntityTypeConfiguration<T>` (подхватываются через `ApplyConfigurationsFromAssembly`), репозитории, миграции, реализации outbox/inbox.
+- `{ServiceName}.Infrastructure` — RabbitMQ (диспетчер outbox и консьюмеры), HTTP-клиенты к другим сервисам, фоновые воркеры, внешние интеграции.
+- `{ServiceName}` — папка API/хоста ASP.NET Core. Внимание: файл проекта внутри неё называется **`{ServiceName}.API.csproj`** (папка без суффикса, csproj с суффиксом).
+
+### Program.cs и Configuration/
+
+`Program.cs` — короткий манифест вызовов; вся логика вынесена в extension-методы под `Configuration/` соответствующего проекта:
+
+- `AddApplicationServices()` — `{ServiceName}.Application/Configuration/ServicesConfiguration.cs`.
+- `AddPersistence(connectionString)` — `{ServiceName}.Persistence/Configuration/PersistenceConfiguration.cs`, регистрирует `DbContext` (Npgsql, с `EnableRetryOnFailure()`) и репозитории.
+- `AddInfrastructure(configuration)` — `{ServiceName}.Infrastructure/Configuration/ServicesConfiguration.cs`, регистрирует RabbitMQ-консьюмеры, `OutboxDispatcher`, HTTP-клиенты, фоновые воркеры.
+- В API-проекте (`{ServiceName}/Configuration/`) — `AddSerilogLogging()` (`LoggingConfiguration.cs`), `AddKeycloakAuthentication(configuration)` (`AuthenticationConfiguration.cs`), `AddApiServices()` (`ServicesConfiguration.cs`), `MigrateDatabaseAsync()` и `MapDevelopmentEndpoints()` (`WebApplicationConfiguration.cs`).
+
+БД мигрируется при старте (`await app.MigrateDatabaseAsync()` до маппинга контроллеров) — отдельного шага миграции в dev/docker-процессе нет.
+
+OpenAPI и UI документации (**Scalar**, `MapScalarApiReference()`, адрес `/scalar`) поднимаются только в Development, внутри `MapDevelopmentEndpoints()`. Swagger UI в проекте не используется.
 
 ### API-слой: контроллеры, маппинг, валидация
 
-Конвенция для `IdentityService` (API-проект), обязательная для любого нового эндпоинта:
+Обязательно для любого нового эндпоинта в любом сервисе:
 
-- **Контроллеры** — только в `Controllers/`, namespace `IdentityService.API.Controllers`. Никаких контроллеров в корне проекта.
-- **Request/Response DTO** — только `sealed record` с `required`-свойствами `{ get; init; }`, не класс и не позиционный record. DTO — неизменяемый слепок данных на один проход, а не объект с поведением; `required init` убирает предупреждения компилятора о nullable-свойствах без значения и не даёт случайно создать DTO с недозаполненными полями.
-- **Маппинг** — только через **Mapster** (`IMapper`/`MapsterMapper`, внедряется в конструктор контроллера), в контроллере не должно быть ручного `new User { ... }` или `new SomethingResponse { ... }`. Все конфигурации маппинга — в `Mapping/MappingRegister.cs` (класс, реализующий `IRegister`), который подхватывается автоматически через `builder.Services.AddMapster()` в `Program.cs` (Mapster сканирует сборку на реализации `IRegister`). Для DTO/сущностей, где имена свойств совпадают, отдельная конфигурация в `MappingRegister` не обязательна для работы маппинга, но запись `config.NewConfig<TSource, TDestination>()` всё равно добавляется явно — так все пары маппинга видны в одном месте и легко расширяются, если понадобится кастомная логика.
-- **Валидация** — только через **FluentValidation**. На каждый request-DTO — свой `AbstractValidator<TRequest>` в `Validators/`. Ничего вызывать вручную в контроллере не нужно: `ValidationFilter` (`Filters/ValidationFilter.cs`, зарегистрирован глобально через `options.Filters.AddValidationFilter()` — extension-метод на `FilterCollection`, объявлен в том же файле) проверяет каждый аргумент действия, для типа которого в DI зарегистрирован `IValidator<T>`, и при ошибке сразу возвращает `400` с `ValidationProblemDetails` — до входа в тело метода контроллера. Валидаторы регистрируются автоматически через `AddValidatorsFromAssemblyContaining<Program>()`.
+- **Контроллеры** — только в `Controllers/`, namespace `{ServiceName}.API.Controllers`. Никаких контроллеров в корне проекта.
+- **Request/Response DTO** — только `sealed record` с `required`-свойствами `{ get; init; }`, не класс и не позиционный record. DTO — неизменяемый слепок данных на один проход; `required init` убирает предупреждения о nullable-свойствах без значения и не даёт создать DTO с недозаполненными полями.
+- **Маппинг** — только через **Mapster** (`IMapper`/`MapsterMapper`, внедряется в конструктор контроллера); ручных `new SomethingResponse { ... }` в контроллере быть не должно. Конфигурации — в `Mapping/MappingRegister.cs` (реализация `IRegister`, подхватывается через `AddMapster()`). Для пар с совпадающими именами свойств отдельная конфигурация не обязательна для работы, но `config.NewConfig<TSource, TDestination>()` всё равно пишется явно — чтобы все пары были видны в одном месте.
+- **Валидация** — только через **FluentValidation**: на каждый request-DTO свой `AbstractValidator<TRequest>` в `Validators/`. Вручную в контроллере ничего вызывать не нужно: `ValidationFilter` (`Filters/ValidationFilter.cs`, регистрируется глобально через `options.Filters.AddValidationFilter()` — extension-метод на `FilterCollection` в том же файле) проверяет каждый аргумент действия, для типа которого зарегистрирован `IValidator<T>`, и при ошибке возвращает `400` с `ValidationProblemDetails` до входа в тело метода. Валидаторы регистрируются через `AddValidatorsFromAssemblyContaining<Program>()`.
 
-Регистрация контроллеров/JSON-опций/`ValidationFilter`/OpenAPI/FluentValidation/Mapster собрана в один вызов `builder.Services.AddApiServices()` (`Configuration/ServicesConfiguration.cs`), а не расписана инлайном в `Program.cs`.
+Регистрация контроллеров, JSON-опций, `ValidationFilter`, OpenAPI, FluentValidation и Mapster собрана в один `builder.Services.AddApiServices()`.
 
-Практическое следствие: чтобы добавить новый эндпоинт с телом запроса, обычно не нужно писать ничего вручную ни для маппинга, ни для валидации — только: DTO, `AbstractValidator` на 3–5 строк, запись в `MappingRegister`, и сам метод контроллера, который просто вызывает `mapper.Map<...>()`. Актуальный скилл для этого — `.claude/skills/add-identity-endpoint/SKILL.md`.
+Практическое следствие: новый эндпоинт с телом запроса — это DTO, валидатор на 3–5 строк, запись в `MappingRegister` и метод контроллера. Скилл для identity-service: `.claude/skills/add-identity-endpoint/SKILL.md` (его шаги переносятся на любой другой сервис — конвенции те же).
 
-### Keycloak как провайдер идентификации
+### Конфигурация
 
-Аутентификация делегирована **Keycloak**, а не выпускается сервисом самостоятельно. Сервис `keycloak` в `docker-compose.yml` импортирует `docker/keycloak/realm-export.json` при каждом старте (`start-dev --import-realm`) — этот файл является источником истины для realm (`cargoservice`), его 5 realm-ролей (соответствуют `IdentityService.Domain.Enums.Role`) и confidential-клиента `identity-service` (service account с ролями `manage-users` и `view-realm` на `realm-management` — вторая нужна, чтобы сервис мог прочитать realm-роль перед назначением её пользователю; без неё регистрация падает `500` с `403` от Keycloak на чтение роли, `directAccessGrantsEnabled` — для прокси-логина через ROPC, см. `AuthController`). Правки realm/клиента вносятся в этот JSON, а не через админ-консоль — изменения из консоли не переживают пересоздание контейнера, а уже импортированный realm при рестарте контейнера **не** переимпортируется повторно (Keycloak по умолчанию пропускает импорт, если realm уже существует) — правки в `realm-export.json` требуют пересоздания тома `postgres_data` (или ручного применения через Admin API/консоль) чтобы попасть в уже поднятый стек.
+Секции `appsettings.json` (`ConnectionStrings`, `Serilog`/`MinimumLevel`, `Seq`, `Keycloak`, `RabbitMQ`, плюс сервис-специфичные — `FileStorageService`, `Smtp`, `Onnx`, `Payments` и т.п.) переопределяются в `docker-compose.yml` переменными окружения через двойное подчёркивание: `ConnectionStrings__DefaultConnection`, `Seq__ServerUrl`, `Keycloak__BaseUrl`, `RabbitMQ__HostName`. Это общий паттерн — в контейнере меняются только хосты, структура конфигурации одна и та же.
 
-- **Валидация токена** (`AddKeycloakAuthentication()` в `Configuration/AuthenticationConfiguration.cs`, вызывается из `Program.cs`): настройки читаются в `KeycloakAuthOptions` (`Configuration/KeycloakAuthOptions.cs`, `KeycloakAuthOptions.Bind(configuration)`) — `BaseUrl`/`Realm`/`ClientId`/`ValidIssuer` из секции `Keycloak`. `AddJwtBearer` строит адрес OIDC-метаданных из `BaseUrl`/`Realm` и валидирует токен против `ValidIssuer`. Эти два значения намеренно разделены: `BaseUrl` — это любой URL, по которому реально можно достучаться до Keycloak по HTTP (`http://localhost:8080` локально, переопределяется на `http://keycloak:8080` через переменную окружения `Keycloak__BaseUrl`, когда оба сервиса работают в `docker-compose`), тогда как `ValidIssuer` всегда равен `http://localhost:8080/realms/cargoservice`, потому что именно это значение `KC_HOSTNAME: localhost` (в `docker-compose.yml`) прописывает в claim `iss` каждого токена независимо от того, как до Keycloak достучались. Если когда-нибудь измените `KC_HOSTNAME`, `ValidIssuer` нужно менять вместе с ним.
-- **`KeycloakBackchannelHandler`** (там же, `AuthenticationConfiguration.cs`): discovery-документ Keycloak тоже привязан к `KC_HOSTNAME` и указывает `jwks_uri` на `http://localhost:8080/...` — недостижимый изнутри контейнера identity-service (там `localhost` — это сам identity-service, запрос за ключами подписи буквально улетает в его же роутинг и получает `404`). Без этого хендлера **любой** валидный токен отклоняется с `401 invalid_token: "The signature key was not found"` при запуске через `docker compose`, хотя при локальном `dotnet run` та же логика работает случайно правильно (там `localhost` — это и есть Keycloak). Хендлер переписывает хост у всех backchannel-запросов (и discovery, и JWKS) на заведомо достижимый `BaseUrl`, независимо от `KC_HOSTNAME`.
-- **Claim-ы ролей**: Keycloak кладёт realm-роли в JSON-claim `realm_access.roles`, а не в отдельные claim-ы. Обработчик `OnTokenValidated` (там же, `MapKeycloakRolesToRoleClaims`) копирует те роли, что совпадают с enum `Role`, в `ClaimTypes.Role`, чтобы `[Authorize(Roles = ...)]` работал как обычно.
-- **Провижининг пользователей**: `IIdentityProviderClient` (интерфейс в `IdentityService.Application`, реализация `KeycloakIdentityProviderClient` в `IdentityService.Infrastructure/Keycloak/`) создаёт пользователя в Keycloak через Admin REST API (client-credentials grant с использованием service account) и назначает realm-роль. `UsersService.CreateUserAsync` вызывает его *до* записи локальной строки, используя id, сгенерированный Keycloak, как `User.Id` — так что `User.Id` в identity-service и id пользователя в Keycloak всегда совпадают (это один и тот же GUID). Отката нет, если локальная запись в БД падает после успешного вызова Keycloak (пользователь-сирота в Keycloak) — приемлемо на данном этапе, вернуться к этому, если станет реальной проблемой.
-- `POST api/users/register` остаётся `[AllowAnonymous]` и всегда создаёт `Client`; `POST api/users/staff` (только `Admin`) — способ создать аккаунт не-клиента — оба идут через один и тот же путь провижининга в Keycloak.
+Логирование: Serilog подключается через `AddSerilogLogging()` на `WebApplicationBuilder`, а не через стандартную секцию `Logging`. Логи всегда идут в консоль; дополнительно в Seq, если задан `Seq:ServerUrl` (`http://localhost:5341` локально, `http://seq:80` в compose).
 
-`AuthController` (`[AllowAnonymous]`) проксирует запросы к token endpoint Keycloak через `IIdentityProviderClient`, оба метода возвращают `{ accessToken, refreshToken, expiresIn, tokenType }` либо `401`: `POST api/auth/login` (`AuthenticateAsync`, ROPC grant) и `POST api/auth/refresh` (`RefreshAsync`, `grant_type=refresh_token`). Для ручного тестирования подходит засеянный пользователь `admin@cargoservice.local` / `admin` из `realm-export.json` — против `login`.
+### Аутентификация: Keycloak
 
-### Публикация событий: транзакционный outbox
+Аутентификация делегирована **Keycloak**; сервисы токены не выпускают. Контейнер `keycloak` импортирует `docker/keycloak/realm-export.json` при старте (`start-dev --import-realm`) — этот файл источник истины для realm `cargoservice`, его 5 realm-ролей (соответствуют `IdentityService.Domain.Enums.Role`) и клиентов (включая confidential-клиент `identity-service` с service account: роли `manage-users` и `view-realm` на `realm-management` — вторая нужна, чтобы прочитать realm-роль перед назначением, без неё регистрация падает `500` с `403` от Keycloak; `directAccessGrantsEnabled` — для прокси-логина через ROPC).
 
-`UsersService.CreateUserAsync` публикует `CargoService.Contracts.Events.V1.UserRegistered` — но только когда `user.Role == Role.Client` (самостоятельная регистрация), не для аккаунтов, созданных через `api/users/staff`, поскольку событие существует для того, чтобы clients-service автоматически создавал `ClientAccount`, а сотрудники не являются клиентами.
+Правки realm вносятся в этот JSON, а не через админ-консоль: изменения из консоли не переживают пересоздание контейнера, а уже импортированный realm при рестарте **не** переимпортируется (Keycloak пропускает импорт, если realm существует). Чтобы правка доехала до поднятого стека, нужно пересоздать том `postgres_data` или применить изменение вручную через Admin API/консоль.
 
-Путь записи разделён на два порта Application, оба реализованы в `IdentityService.Persistence/Outbox/` поверх одного и того же `AppDbContext`:
-- `IOutboxWriter.Enqueue(...)` — вызывается `UsersService` *до* `usersRepository.CreateAsync(user, ...)`. Он только ставит строку `OutboxMessage` в очередь на уровне DbContext (без `SaveChanges`); следующий сразу за ним вызов репозитория делает реальный `SaveChangesAsync`, который — поскольку оба идут через один и тот же scoped-экземпляр `AppDbContext` — коммитит вставку `User` и вставку `OutboxMessage` в одной транзакции БД. Этот порядок (сначала enqueue, затем позволить следующему вызову репозитория сохранить) — вся суть трюка, и его легко случайно сломать; компилятор здесь unit-of-work не защищает.
-- `IOutboxReader` (`GetPendingAsync`/`MarkProcessedAsync`) — используется диспетчером ниже, а не кодом обработки запросов.
+В каждом API-проекте:
 
-`IdentityService.Infrastructure/Outbox/OutboxDispatcher.cs` — это `BackgroundService` (регистрируется через `AddHostedService` в `AddInfrastructure`), который опрашивает `IOutboxReader` каждые 5с, публикует накопленные строки в `RabbitMqConventions.EventsExchange` (topic-exchange `cargoservice.events`), используя предвычисленный routing key каждой строки (`RabbitMqConventions.RoutingKey("identity-service", nameof(UserRegistered))` → `identity-service.user-registered`), и помечает их обработанными. Если RabbitMQ недоступен или соединение обрывается, весь цикл подключения+опроса повторяется через 10с вместо падения хоста — необработанное исключение в `BackgroundService` иначе по умолчанию роняет всё приложение. Настройки подключения к RabbitMQ берутся из секции конфигурации `RabbitMQ` / переопределения переменной окружения `RabbitMQ__HostName` в `docker-compose.yml` (тот же паттерн переопределения, что у `ConnectionStrings`/`Seq`/`Keycloak`).
+- **Валидация токена** — `AddKeycloakAuthentication()` в `Configuration/AuthenticationConfiguration.cs`; настройки читаются в `KeycloakAuthOptions` (`BaseUrl`/`Realm`/`ClientId`/`ValidIssuer`, секция `Keycloak`). `BaseUrl` и `ValidIssuer` намеренно разделены: `BaseUrl` — адрес, по которому Keycloak реально достижим (`http://localhost:8080` локально, `http://keycloak:8080` в compose), а `ValidIssuer` всегда `http://localhost:8080/realms/cargoservice`, потому что именно это значение `KC_HOSTNAME: localhost` прописывает в claim `iss` любого токена. Меняете `KC_HOSTNAME` — меняйте `ValidIssuer` вместе с ним.
+- **`KeycloakBackchannelHandler`** (там же) переписывает хост у backchannel-запросов (discovery и JWKS) на `BaseUrl`. Без него discovery-документ уводит сервис за ключами подписи на `http://localhost:8080/...`, что внутри контейнера означает его собственный роутинг и `404`, и **любой** валидный токен отклоняется с `401 invalid_token: "The signature key was not found"` — при этом при локальном `dotnet run` та же логика работает случайно правильно.
+- **Claim-ы ролей**: Keycloak кладёт realm-роли в JSON-claim `realm_access.roles`. Обработчик `OnTokenValidated` (`MapKeycloakRolesToRoleClaims`) копирует известные роли в `ClaimTypes.Role`, чтобы `[Authorize(Roles = ...)]` работал обычным образом.
 
-Сейчас никто не потребляет `identity-service.user-registered` — это должен делать clients-service, который ещё не построен (см. spec.md, Фаза 2).
+### Межсервисные HTTP-вызовы
+
+Синхронные вызовы используются точечно: orders → pricing (расчёт цены) и cargo/document/ai-inspection → file-storage (presigned URL).
+
+Клиент живёт в `{ServiceName}.Infrastructure/{Target}/`, за интерфейсом из Application (`IPricingClient`, `IFileStorageClient`), регистрируется через `AddHttpClient<>` с политиками **Polly** (retry + таймаут на попытку; общий таймаут `HttpClient` — предохранитель, он специально больше, чем таймаут попытки, иначе обрезал бы retry на середине).
+
+Авторизация машина-к-машине — `ServiceTokenProvider` (`Infrastructure/Keycloak/`): client credentials grant по `KeycloakServiceAccount`-секции, токен кэшируется на процесс (поэтому провайдер — singleton).
+
+### Событийный обмен
+
+Общие контракты — `shared/CargoService.Contracts`: DTO событий в `Events/V1/` (все наследуют `IntegrationEvent` с `EventId`), конвенции в `Messaging/RabbitMqConventions.cs`:
+
+- один topic exchange `cargoservice.events` (`EventsExchange`);
+- routing key — `{publishing-service}.{event-name-in-kebab-case}` (`RoutingKey("identity-service", nameof(UserRegistered))` → `identity-service.user-registered`);
+- имя очереди — `{consuming-service}.{event-name-in-kebab-case}`, DLQ — то же имя с суффиксом `.dlq`.
+
+**Публикация — транзакционный outbox.** Два порта Application поверх одного `AppDbContext`:
+
+- `IOutboxWriter.Enqueue(...)` вызывается сценарием *до* вызова репозитория. Он только добавляет строку `OutboxMessage` в DbContext (без `SaveChanges`); следующий вызов репозитория делает `SaveChangesAsync`, который — поскольку это тот же scoped-экземпляр `AppDbContext` — коммитит доменную строку и строку outbox одной транзакцией. Этот порядок и есть суть паттерна, сломать его легко: компилятор unit-of-work здесь не защищает.
+- `IOutboxReader` (`GetPendingAsync`/`MarkProcessedAsync`) используется только диспетчером.
+
+`{ServiceName}.Infrastructure/Outbox/OutboxDispatcher.cs` — `BackgroundService`: опрашивает reader каждые 5с, публикует строки в exchange по их предвычисленному routing key, помечает обработанными. При недоступности RabbitMQ цикл подключения повторяется через 10с, а не роняет хост (необработанное исключение в `BackgroundService` по умолчанию завершает приложение).
+
+Outbox есть у: identity, pricing, orders, cargo, ai-inspection, document, payment.
+
+**Потребление.** Два стиля, оба — `BackgroundService` с собственной очередью, DLQ (`x-dead-letter-exchange: ""` + `x-dead-letter-routing-key: {queue}.dlq`, дефолтный exchange роутит по имени очереди — отдельный DLX не нужен), `prefetchCount: 10`, ручной ack и переподключением через 10с:
+
+- **Обобщённый `EventConsumer<TEvent>`** (notification, document, payment) — одна реализация на все подписки: десериализует payload, проверяет inbox, вызывает `IEventHandler<TEvent>` из скоупа, отмечает обработку. Подписки объявляются строками `services.AddEventConsumer<OrderConfirmed>("orders-service")`.
+- **Отдельный консьюмер на событие** (clients `UserRegisteredConsumer`, orders, cargo, ai-inspection) — класс на подписку.
+
+**Inbox-дедупликация** (`IInboxRepository` + `Persistence/Inbox/`) есть у notification, document, payment, ai-inspection. Отметка ставится **после** обработки, а не до: при падении между отметкой и записью худший случай — повторная обработка (от неё защищают доменные инварианты), тогда как обратный порядок потерял бы событие навсегда. У clients, orders и cargo inbox-а нет — идемпотентность там обеспечивается доменными проверками.
+
+В DLQ уходит только то, что действительно не обработать: битый payload, отказ БД.
+
+### Тесты
+
+У каждого сервиса, кроме file-storage-service, два тестовых проекта:
+
+- `{ServiceName}.Application.Tests` — xUnit + Moq на сервисы слоя Application (репозитории, клиенты и `IOutboxWriter` мокаются). Внешних зависимостей не требуют.
+- `{ServiceName}.IntegrationTests` — xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers: реальный API поверх одноразового контейнера Postgres (`{Service}ApiFactory`, один контейнер на класс через `IClassFixture`). Нужен запущенный Docker.
+
+Что подменяется в интеграционных тестах: `TestAuthHandler` (читает заголовок `X-Test-Roles` через запятую вместо валидации JWT; становится дефолтной схемой через `ConfigureTestServices`, переопределяя `AddJwtBearer`), фейковые HTTP-клиенты (`FakeIdentityProviderClient`, `FakePricingClient` и т.п.), и `services.RemoveAll<IHostedService>()` — чтобы не поднимать RabbitMQ. Проверяются и HTTP-статусы, и, через второй `AppDbContext` на тот же контейнер, строки в БД (включая `OutboxMessages` с ожидаемым routing key).
+
+**Известная проблема.** Строку подключения в тестовой фабрике нужно задавать через `builder.UseSetting("ConnectionStrings:DefaultConnection", ...)`, а не через `ConfigureAppConfiguration`: `Program.cs` читает конфигурацию **до** `builder.Build()`, а источники из `ConfigureAppConfiguration` подмешиваются только на этапе построения хоста, то есть позже. В результате тесты молча уходят на `localhost:5432` из `appsettings.json` и падают с `28P01`. На `UseSetting` переведены фабрики notification, document, payment, ai-inspection; **ещё не переведены** identity, clients, pricing, orders, cargo — их «падающие из-за окружения» интеграционные тесты падают именно поэтому. Второй нюанс того же места: схему создаёт сам хост при старте (`MigrateDatabaseAsync`), а `WebApplicationFactory` поднимает его лениво — если тест сначала засеивает данные через `DbContext`, в `InitializeAsync` после старта контейнера нужно дёрнуть `CreateClient()`, иначе будет `42P01: relation ... does not exist`.
+
+### Docker
+
+Контекст сборки каждого Dockerfile — **корень репозитория** (`build.context: .`, `dockerfile: services/{service}/Dockerfile`), потому что `{ServiceName}.Application` ссылается на `shared/CargoService.Contracts` вне папки сервиса. По той же причине dev-стадия в `docker-compose.override.yml` монтирует весь корень (`.:/src`).
+
+`docker-compose.override.yml` подхватывается автоматически (без `-f`) и запускает сервисы через dev-стадию Dockerfile (`dotnet watch`, исходники смонтированы как volume) вместо опубликованного `final`-образа — правки в `.cs` подхватываются без пересборки образа.
+
+## Сервисы
+
+Порты, назначение и адреса инфраструктурных UI — в [README.md](README.md). Ниже — то, что специфично для работы с кодом каждого сервиса.
+
+**identity-service** (8081, БД `cargoservice`, compose-сервис `cargoservice`). `User` без поля пароля — учётные данные целиком в Keycloak. `IIdentityProviderClient`/`KeycloakIdentityProviderClient` создаёт пользователя через Admin REST API и назначает realm-роль; `UsersService.CreateUserAsync` вызывает его *до* записи локальной строки и использует сгенерированный Keycloak id как `User.Id` — это один и тот же GUID. Отката нет, если локальная вставка упадёт после успешного вызова Keycloak (сирота в Keycloak) — принято осознанно. `POST api/users/register` — `[AllowAnonymous]`, всегда создаёт `Client`; `POST api/users/staff` (только `Admin`) — остальные роли. `UserRegistered` публикуется только для роли `Client`: событие существует ради создания `ClientAccount` в clients-service, а сотрудники клиентами не являются. `AuthController` (`[AllowAnonymous]`) проксирует token endpoint Keycloak: `POST api/auth/login` (ROPC) и `POST api/auth/refresh`, оба возвращают `{ accessToken, refreshToken, expiresIn, tokenType }` либо `401`. Для ручной проверки есть засеянный `admin@cargoservice.local` / `admin`.
+
+**clients-service** (8082). `Counterparty` и `ClientAccount`, CRUD и поиск контрагентов. `UserRegisteredConsumer` создаёт `ClientAccount` по событию identity-service. Своих событий не публикует — outbox-а нет.
+
+**pricing-service** (8083). `TariffRate` (категории `ShippingType`/`PackagingType`/`PickupDelivery`/`Insurance`, коды в `TariffCodes`), `TariffsController` (чтение всем, правка админом) и `PricingController` с публичным расчётом. Публикует `TariffChanged` через outbox. Консьюмеров нет.
+
+**orders-service** (8084). `Order` с вложенными `OrderParty`/`OrderServiceOptions`. При создании заявки синхронно вызывает pricing (`IPricingClient` + `InMemoryCalculationCache`, TTL 10 минут); кэш целиком сбрасывается по `TariffChanged` (`IMemoryCache` не умеет «очистить всё» — все записи привязаны к общему `CancellationTokenSource`, `Clear()` отменяет его и ставит новый). Публикует `OrderCreated`/`OrderConfirmed`/`OrderCancelled`, потребляет `CargoStatusChanged`, `PaymentCompleted`, `TariffChanged`. Доступ к заявкам — только своим: владелец берётся из claim `sub` токена (`GetUserId()` в контроллере), а не из query-параметра.
+
+**cargo-service** (8085, БД `cargoshipments`). `Shipment`, `AcceptanceInspection`, `PackagingService`, `ShipmentStatusHistory`. Создаёт груз по `OrderConfirmed`, потребляет `PackageIntegrityAssessed`, публикует `CargoAccepted`/`CargoStatusChanged`/`CargoPhotoUploaded`/`CargoDelivered`. `TrackingController` — публичный трекинг без авторизации. `SlaMonitor` — фоновая джоба: раз в 5 минут пачками по 100 переводит грузы с истёкшим `DeliveryDeadline` в «Задерживается» обычным путём смены статуса (с историей и событием). Фото складывает в file-storage через `IFileStorageClient`.
+
+**file-storage-service** (8086). Единственный сервис **без БД**: нет Domain и Persistence, нет миграций и тестов. `MinioFileStorage` поверх MinIO, `BucketInitializer` создаёт бакет при старте, `FilesController` выдаёт presigned URL на загрузку и скачивание. `MinioClients` держит два клиента к одному хранилищу: `Operations` ходит по внутреннему адресу (`minio:9000`), `Presigning` подписывает ссылки внешним (`localhost:9000`). Переписать хост в готовой ссылке нельзя — он входит в подпись SigV4, и MinIO ответит `403`.
+
+**notification-service** (8087). Самый «слушающий» сервис: 11 подписок через обобщённый `EventConsumer<TEvent>` и по `IEventHandler<T>` на каждое событие. `TemplateRenderer` подставляет значения в `NotificationTemplate`, отправка — через `INotificationSenderRegistry` по каналам: `SmtpEmailSender` (в dev — Mailpit), `TwilioSmsSender`/`LoggingSmsSender`. Ведёт `NotificationLog`, `NotificationRecipient`, `NotificationPreference`; `NotificationsController` отдаёт историю клиенту. Есть inbox.
+
+**ai-inspection-service** (8088). Потребляет `CargoPhotoUploaded`, публикует `PackageIntegrityAssessed`. `IPackageInspectionModel` реализуется `OnnxPackageInspectionModel` (singleton — `InferenceSession` держит веса в памяти) **или** `StubPackageInspectionModel`, если файл модели не найден: отсутствие модели — нормальное состояние dev-стенда и тестов, заглушка пишет предупреждение на каждый вердикт. Порог `DamageConfidenceThreshold` — бизнес-правило, живёт в `InspectionOptions` в Application. `InspectionWorker` обрабатывает очередь `InspectionJob`, `ModelEvaluator` считает метрики по размеченному набору.
+
+**document-service** (8089). Потребляет `OrderCreated`/`OrderConfirmed` (складывает `OrderSnapshot` — данные заявки нужны позже, ходить за ними в orders он не может) и `CargoAccepted`/`CargoDelivered` (генерирует накладную и акты). Рендер — QuestPDF (`QuestPdfDocumentRenderer`, шрифты PT Sans лежат в `Infrastructure/Fonts/`), трек-код — `QrTrackingCodeGenerator`. Готовый PDF кладётся в file-storage, публикуется `DocumentGenerated`.
+
+**payment-service** (8090). Выставляет счёт по `OrderConfirmed`, возвращает деньги по `OrderCancelled`, публикует `PaymentCompleted`/`PaymentFailed`/`RefundIssued`. `IPaymentProviderClient` — `YooKassaPaymentProviderClient` при настроенных кредах, иначе `SandboxPaymentProviderClient`. `PaymentsController` принимает webhook провайдера; исход платежа обрабатывает `PaymentWebhooksService`. Счёт уникален по заявке — это и есть защита от повторной обработки события.
 
 ## Команды
 
-Сборка/запуск identity-service (из `services/identity-service/`):
+Сборка и запуск одного сервиса (из его папки, например `services/identity-service/`):
+
 ```
 dotnet build IdentityService.slnx
 dotnet run --project IdentityService
 ```
 
-Полный локальный стек (Postgres + RabbitMQ + MinIO + Seq + Keycloak + API identity-service), из корня репозитория:
+Полный локальный стек (Postgres, RabbitMQ, MinIO, Mailpit, Seq, Keycloak и все десять сервисов), из корня репозитория:
+
 ```
 docker compose up --build
 ```
-`docker-compose.override.yml` подхватывается автоматически (без `-f`) и запускает сервис через dev-стадию Dockerfile (`dotnet watch`, исходники смонтированы как volume) вместо опубликованного `final`-образа — правки в `.cs`-файлах под `services/identity-service/` (или `shared/CargoService.Contracts/`) подхватываются в контейнере без пересборки. dev-стадия/override-запись для каждого сервиса добавляется вместе с его `Dockerfile` по мере реализации.
 
-Контекст сборки `services/identity-service/Dockerfile` — **корень репозитория** (`build.context: .` в `docker-compose.yml`, `dockerfile: services/identity-service/Dockerfile`), а не сам `services/identity-service/` — `IdentityService.Application` ссылается на `shared/CargoService.Contracts`, которая лежит вне папки сервиса и иначе была бы недостижима для Docker. Та же причина у bind-mount dev-стадии в `docker-compose.override.yml`: он монтирует весь корень репозитория (`.:/src`), а не только `services/identity-service/`, чтобы `shared/CargoService.Contracts` тоже была видна для `dotnet watch`. Если добавите сервис, чей Dockerfile нуждается только в собственной папке (без зависимости на shared-проект), более узкий контекст на сервис проще и вполне подходит — паттерн «весь корень репозитория» нужен только из-за зависимости на Contracts.
+EF Core-миграции — из папки `{ServiceName}.Persistence` соответствующего сервиса:
 
-EF Core-миграции (запускаются из `services/identity-service/IdentityService.Persistence/`):
 ```
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```
-`--startup-project` не нужен — `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) позволяет `dotnet ef` строить `AppDbContext` напрямую вместо сборки всего хоста `IdentityService`, который иначе также запускал бы (и требовал бы валидной конфигурации для) `AddKeycloakAuthentication`/`AddInfrastructure` (Keycloak/RabbitMQ). Фабрика читает строку подключения из переменной окружения `ConnectionStrings__DefaultConnection`, откатываясь к тому же локальному дефолту Postgres, что и `appsettings.json`. `AddPersistence` (регистрация времени выполнения) и фабрика — оба включают `EnableRetryOnFailure()` на провайдере Npgsql.
 
-## Тесты
+`--startup-project` не нужен: `AppDbContextFactory` (`IDesignTimeDbContextFactory<AppDbContext>`) позволяет `dotnet ef` построить `AppDbContext` напрямую, не собирая хост API (который иначе потребовал бы валидной конфигурации Keycloak/RabbitMQ). Фабрика читает `ConnectionStrings__DefaultConnection` из переменных окружения, откатываясь к локальному дефолту из `appsettings.json`.
 
-`services/identity-service/IdentityService.Application.Tests/` — unit-тесты на xUnit + Moq для `UsersService` (мокает `IUsersRepository`/`IIdentityProviderClient`/`IOutboxWriter`; покрывает присвоение id от провайдера идентификации, правило постановки в outbox только для роли Client, делегирование update/delete).
-
-`services/identity-service/IdentityService.IntegrationTests/` — xUnit + `Microsoft.AspNetCore.Mvc.Testing` + Testcontainers, гоняет реальный API поверх одноразового контейнера Postgres (`IdentityApiFactory`, один контейнер на тестовый класс через `IClassFixture`). Два заменителя подставляются вместо того, что нужно реальному деплою, но эти тесты не разворачивают: `FakeIdentityProviderClient` (без реального Keycloak) и `TestAuthHandler` (читает заголовок запроса `X-Test-Roles` через запятую вместо валидации настоящего JWT; становится дефолтной auth-схемой через `ConfigureTestServices`, переопределяя `AddJwtBearer` из `AddKeycloakAuthentication()`). `IHostedService` диспетчера outbox в тестах тоже убран — контейнер RabbitMQ не нужен. Тесты проверяют HTTP-статус-коды и, через второй `AppDbContext`, указывающий на тот же контейнер, напрямую строки `Users`/`OutboxMessages` (например, регистрация `Client` создаёт и строку пользователя, и ровно одну строку outbox с routing key `identity-service.user-registered`; создание сотрудника — нет).
+Тесты:
 
 ```
-dotnet test IdentityService.Application.Tests   # без внешних зависимостей
-dotnet test IdentityService.IntegrationTests    # нужен запущенный Docker-демон (Testcontainers)
+dotnet test services/identity-service/IdentityService.Application.Tests   # без внешних зависимостей
+dotnet test services/identity-service/IdentityService.IntegrationTests    # нужен запущенный Docker (Testcontainers)
 ```
